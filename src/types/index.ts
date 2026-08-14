@@ -26,6 +26,9 @@ export interface Project {
 
 export type StudyDirection = 'ja-to-en' | 'en-to-ja'
 
+// 学習モード: 従来の一対一フラッシュカード / ニュアンス比較
+export type AppMode = 'flashcard' | 'nuance'
+
 export type StudyResult = 'correct' | 'incorrect'
 
 // Mastery level → interval days

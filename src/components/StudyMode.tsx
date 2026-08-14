@@ -261,6 +261,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, onResul
         <CardEditor
           card={editingCard}
           projects={projects}
+          existingGroupIds={Array.from(new Set(cards.map((c) => c.groupId).filter(Boolean)))}
           onSave={(changes) => {
             onUpdate(editingCard.id, changes)
             // queue内のカードも更新

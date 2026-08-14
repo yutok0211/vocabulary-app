@@ -9,6 +9,7 @@ import { importFromCSV } from '../lib/csv'
 import { useTTS } from '../hooks/useTTS'
 import type { VoiceLang } from '../hooks/useSettings'
 import { getDueCards } from '../lib/mastery'
+import { getNuanceGroups } from '../lib/nuance'
 
 interface Props {
   cards: WordCard[]
@@ -25,6 +26,7 @@ interface Props {
   onToggleFavorite: (id: string) => void
   onImport: (partials: Partial<WordCard>[]) => void
   onStudy: () => void
+  onStudyNuance: () => void
   onBack: () => void
 }
 
@@ -43,6 +45,7 @@ export function WordList({
   onToggleFavorite,
   onImport,
   onStudy,
+  onStudyNuance,
   onBack,
 }: Props) {
   const [query, setQuery] = useState('')
@@ -74,6 +77,8 @@ export function WordList({
   )
 
   const dueCount = getDueCards(scopedCards).length
+  const nuanceGroupCount = getNuanceGroups(scopedCards).length
+  const existingGroupIds = Array.from(new Set(cards.map((c) => c.groupId).filter(Boolean)))
 
   const projectName =
     projectId === 'favorites'
@@ -221,6 +226,17 @@ export function WordList({
         </button>
       )}
 
+      {/* ニュアンス比較モード バナー */}
+      {nuanceGroupCount > 0 && (
+        <button
+          onClick={onStudyNuance}
+          className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3.5 text-left text-white shadow hover:opacity-90"
+        >
+          <p className="font-semibold">ニュアンス比較モード</p>
+          <p className="text-sm text-amber-100">{nuanceGroupCount} グループで出題可能</p>
+        </button>
+      )}
+
       {/* 選択モード起動 / 選択バー */}
       {selectMode ? (
         <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5">
@@ -326,6 +342,7 @@ export function WordList({
         <CardEditor
           card={{ projectId: projectId === 'favorites' ? '' : projectId }}
           projects={projects}
+          existingGroupIds={existingGroupIds}
           onSave={(changes) => onAdd(changes)}
           onClose={() => setAdding(false)}
         />
@@ -334,6 +351,7 @@ export function WordList({
         <CardEditor
           card={editing}
           projects={projects}
+          existingGroupIds={existingGroupIds}
           onSave={(changes) => onUpdate(editing.id, changes)}
           onClose={() => setEditing(null)}
         />

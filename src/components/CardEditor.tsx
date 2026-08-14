@@ -7,17 +7,21 @@ import { MASTERY_INTERVALS } from '../types'
 interface Props {
   card: Partial<WordCard>
   projects: Project[]
+  existingGroupIds?: string[]
   onSave: (changes: Partial<WordCard>) => void
   onClose: () => void
 }
 
-export function CardEditor({ card, projects, onSave, onClose }: Props) {
+export function CardEditor({ card, projects, existingGroupIds = [], onSave, onClose }: Props) {
   const [japanese, setJapanese] = useState(card.japanese ?? '')
   const [english, setEnglish] = useState(card.english ?? '')
   const [notes, setNotes] = useState(card.notes ?? '')
   const [images, setImages] = useState<string[]>(card.images ?? [])
   const [masteryLevel, setMasteryLevel] = useState<number>(card.masteryLevel ?? 0)
   const [projectId, setProjectId] = useState<string>(card.projectId ?? '')
+  const [groupId, setGroupId] = useState(card.groupId ?? '')
+  const [degreeRank, setDegreeRank] = useState<number>(card.degreeRank ?? 0)
+  const [exampleSentence, setExampleSentence] = useState(card.exampleSentence ?? '')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,7 +52,18 @@ export function CardEditor({ card, projects, onSave, onClose }: Props) {
       intervalDays === 0
         ? new Date().toISOString()
         : (() => { const d = new Date(); d.setDate(d.getDate() + intervalDays); return d.toISOString() })()
-    onSave({ japanese: japanese.trim(), english: english.trim(), notes, images, masteryLevel, nextReviewDate, projectId })
+    onSave({
+      japanese: japanese.trim(),
+      english: english.trim(),
+      notes,
+      images,
+      masteryLevel,
+      nextReviewDate,
+      projectId,
+      groupId: groupId.trim(),
+      degreeRank,
+      exampleSentence: exampleSentence.trim(),
+    })
     onClose()
   }
 
@@ -93,6 +108,54 @@ export function CardEditor({ card, projects, onSave, onClose }: Props) {
               className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="例文、語源、覚え方など..."
             />
+          </div>
+
+          {/* ニュアンス比較モード */}
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3">
+            <p className="mb-2 text-sm font-medium text-gray-700">ニュアンス比較モード（任意）</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">グループ名</label>
+                <input
+                  value={groupId}
+                  onChange={(e) => setGroupId(e.target.value)}
+                  list="group-id-options"
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="例: delicious系"
+                />
+                <datalist id="group-id-options">
+                  {existingGroupIds.map((g) => (
+                    <option key={g} value={g} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">強度ランク（1弱〜6強）</label>
+                <select
+                  value={degreeRank}
+                  onChange={(e) => setDegreeRank(Number(e.target.value))}
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value={0}>未設定</option>
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="mb-1 block text-xs text-gray-500">シチュエーション文（対象の英単語を含む例文）</label>
+              <textarea
+                value={exampleSentence}
+                onChange={(e) => setExampleSentence(e.target.value)}
+                rows={2}
+                className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="例: The kangaroo jerky is delicious."
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                クイズ出題時、文中の英単語部分が自動で空欄になります。同じグループ・2枚以上のカードで設定するとニュアンス比較モードに出題されます。
+              </p>
+            </div>
           </div>
 
           {/* プロジェクト */}

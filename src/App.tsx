@@ -7,11 +7,12 @@ import { useSettings } from './hooks/useSettings'
 import { ProjectList } from './components/ProjectList'
 import { WordList } from './components/WordList'
 import { StudyMode } from './components/StudyMode'
+import { NuanceQuizMode } from './components/NuanceQuizMode'
 import { AuthScreen } from './components/AuthScreen'
 import { SettingsModal } from './components/SettingsModal'
 import { isFirebaseConfigured } from './lib/firebase'
 
-type View = 'projects' | 'list' | 'study'
+type View = 'projects' | 'list' | 'study' | 'nuance'
 
 export default function App() {
   const { user, loading, login, register, logout } = useAuth()
@@ -122,6 +123,7 @@ export default function App() {
             onToggleFavorite={toggleFavorite}
             onImport={importCards}
             onStudy={() => setView('study')}
+            onStudyNuance={() => setView('nuance')}
             onBack={() => setView('projects')}
           />
         )}
@@ -134,6 +136,15 @@ export default function App() {
             voiceLang={voiceLang}
             onResult={recordResult}
             onUpdate={updateCard}
+            onBack={() => setView('list')}
+          />
+        )}
+        {view === 'nuance' && (
+          <NuanceQuizMode
+            cards={scopedCards}
+            rate={rate}
+            voiceLang={voiceLang}
+            onResult={recordResult}
             onBack={() => setView('list')}
           />
         )}

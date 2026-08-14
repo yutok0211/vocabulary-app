@@ -11,6 +11,9 @@ export function exportToCSV(cards: WordCard[]): void {
     correctCount: c.correctCount,
     nextReviewDate: c.nextReviewDate,
     createdAt: c.createdAt,
+    groupId: c.groupId,
+    degreeRank: c.degreeRank,
+    exampleSentence: c.exampleSentence,
   }))
 
   const csv = Papa.unparse(rows, { header: true })
@@ -39,6 +42,9 @@ export function importFromCSV(file: File): Promise<Partial<WordCard>[]> {
             reviewCount: parseInt(row.reviewCount ?? '0', 10) || 0,
             correctCount: parseInt(row.correctCount ?? '0', 10) || 0,
             images: [],
+            groupId: row.groupId ?? '',
+            degreeRank: parseInt(row.degreeRank ?? '0', 10) || 0,
+            exampleSentence: row.exampleSentence ?? '',
           }))
         resolve(cards)
       },

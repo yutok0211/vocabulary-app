@@ -12,6 +12,9 @@ export interface WordCard {
   updatedAt: string
   isFavorite: boolean
   projectId: string // '' = 未分類
+  groupId: string // '' = 未グループ。ニュアンス比較モード用（例: 'delicious系'）
+  degreeRank: number // 0 = 未設定。1〜6でグループ内の強度ランク
+  exampleSentence: string // ニュアンス比較モードの出題文。対象の英単語を含む例文
 }
 
 export interface Project {
@@ -22,6 +25,9 @@ export interface Project {
 }
 
 export type StudyDirection = 'ja-to-en' | 'en-to-ja'
+
+// 学習モード: 従来の一対一フラッシュカード / ニュアンス比較
+export type AppMode = 'flashcard' | 'nuance'
 
 export type StudyResult = 'correct' | 'incorrect'
 

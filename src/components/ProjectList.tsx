@@ -1,24 +1,28 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, Heart, BookOpen, Layers } from 'lucide-react'
-import type { Project, WordCard } from '../types'
+import { Plus, Pencil, Trash2, Heart, BookOpen, Layers, ChevronLeft } from 'lucide-react'
+import type { Project, WordCard, AppMode } from '../types'
 import { getDueCards } from '../lib/mastery'
 
 interface Props {
   projects: Project[]
   cards: WordCard[]
+  mode: AppMode
   onSelectProject: (projectId: string | 'favorites') => void
   onAddProject: (name: string) => void
   onUpdateProject: (id: string, name: string) => void
   onDeleteProject: (id: string) => void
+  onBack: () => void
 }
 
 export function ProjectList({
   projects,
   cards,
+  mode,
   onSelectProject,
   onAddProject,
   onUpdateProject,
   onDeleteProject,
+  onBack,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -50,8 +54,16 @@ export function ProjectList({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-800">プロジェクト</h2>
+      <div className="flex items-center gap-2">
+        <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-800">
+          <ChevronLeft size={20} />
+        </button>
+        <h2 className="flex-1 text-lg font-bold text-gray-800">
+          プロジェクト
+          <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 align-middle text-xs font-medium text-gray-500">
+            {mode === 'flashcard' ? '単語カード学習' : 'ニュアンス比較モード'}
+          </span>
+        </h2>
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-700"

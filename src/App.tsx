@@ -4,19 +4,23 @@ import { useAuth } from './hooks/useAuth'
 import { useCards } from './hooks/useCards'
 import { useProjects } from './hooks/useProjects'
 import { useSettings } from './hooks/useSettings'
+import { ModeSelect } from './components/ModeSelect'
 import { ProjectList } from './components/ProjectList'
 import { WordList } from './components/WordList'
 import { StudyMode } from './components/StudyMode'
+import { NuanceQuizMode } from './components/NuanceQuizMode'
 import { AuthScreen } from './components/AuthScreen'
 import { SettingsModal } from './components/SettingsModal'
 import { isFirebaseConfigured } from './lib/firebase'
+import type { AppMode } from './types'
 
-type View = 'projects' | 'list' | 'study'
+type View = 'modes' | 'projects' | 'list' | 'study' | 'nuance'
 
 export default function App() {
   const { user, loading, login, register, logout } = useAuth()
   const [skipped, setSkipped] = useState(false)
-  const [view, setView] = useState<View>('projects')
+  const [view, setView] = useState<View>('modes')
+  const [appMode, setAppMode] = useState<AppMode>('flashcard')
   const [showSettings, setShowSettings] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string | 'favorites'>('')
 
@@ -56,7 +60,7 @@ export default function App() {
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
           <div
             className="flex items-center gap-2 cursor-pointer"
-            onClick={() => setView('projects')}
+            onClick={() => setView('modes')}
           >
             <BookOpen size={22} className="text-indigo-600" />
             <span className="font-bold text-gray-800">語彙学習</span>
@@ -93,10 +97,19 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-6">
+        {view === 'modes' && (
+          <ModeSelect
+            onSelect={(m) => {
+              setAppMode(m)
+              setView('projects')
+            }}
+          />
+        )}
         {view === 'projects' && (
           <ProjectList
             projects={projects}
             cards={cards}
+            mode={appMode}
             onSelectProject={(pid) => {
               setSelectedProjectId(pid)
               setView('list')
@@ -104,6 +117,7 @@ export default function App() {
             onAddProject={addProject}
             onUpdateProject={updateProject}
             onDeleteProject={deleteProject}
+            onBack={() => setView('modes')}
           />
         )}
         {view === 'list' && (
@@ -111,6 +125,7 @@ export default function App() {
             cards={cards}
             projects={projects}
             projectId={selectedProjectId}
+            mode={appMode}
             direction={direction}
             rate={rate}
             voiceLang={voiceLang}
@@ -122,6 +137,7 @@ export default function App() {
             onToggleFavorite={toggleFavorite}
             onImport={importCards}
             onStudy={() => setView('study')}
+            onStudyNuance={() => setView('nuance')}
             onBack={() => setView('projects')}
           />
         )}
@@ -134,6 +150,15 @@ export default function App() {
             voiceLang={voiceLang}
             onResult={recordResult}
             onUpdate={updateCard}
+            onBack={() => setView('list')}
+          />
+        )}
+        {view === 'nuance' && (
+          <NuanceQuizMode
+            cards={scopedCards}
+            rate={rate}
+            voiceLang={voiceLang}
+            onResult={recordResult}
             onBack={() => setView('list')}
           />
         )}

@@ -20,6 +20,9 @@ function newCard(partial: Partial<WordCard>): WordCard {
     updatedAt: now,
     isFavorite: false,
     projectId: '',
+    groupId: '',
+    degreeRank: 0,
+    exampleSentence: '',
     ...partial,
   }
 }
@@ -30,11 +33,14 @@ export function useCards(userId: string | null) {
   useEffect(() => {
     if (!userId) return
     const unsub = subscribeCards(userId, (remote) => {
-      // 既存カードに isFavorite / projectId がない場合デフォルト補完
+      // 既存カードに新フィールドがない場合デフォルト補完
       const normalized = remote.map((c) => ({
         ...c,
         isFavorite: c.isFavorite ?? false,
         projectId: c.projectId ?? '',
+        groupId: c.groupId ?? '',
+        degreeRank: c.degreeRank ?? 0,
+        exampleSentence: c.exampleSentence ?? '',
       }))
       setCards(normalized)
       saveLocal(normalized)

@@ -38,7 +38,7 @@ export function TextExport({ cards, onClose }: Props) {
     if (alphabetical) sorted.sort((a, b) => a.english.localeCompare(b.english))
     return sorted
       .map((c) => {
-        if (includeNotes) return [c.english, c.japanese, c.notes ?? ''].join(td)
+        if (includeNotes) return [c.english, c.japanese, (Array.isArray(c.notes) ? c.notes[0] : c.notes) ?? ''].join(td)
         return [c.english, c.japanese].join(td)
       })
       .join(cd)

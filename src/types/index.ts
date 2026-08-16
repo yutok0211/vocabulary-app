@@ -2,7 +2,7 @@ export interface WordCard {
   id: string
   japanese: string
   english: string
-  notes: string
+  notes: string[]
   images: string[] // base64 data URLs
   masteryLevel: number // 0-5
   nextReviewDate: string // ISO string

@@ -5,7 +5,7 @@ import { MasteryBadge } from './MasteryBadge'
 import { CardEditor } from './CardEditor'
 import { TextImport } from './TextImport'
 import { TextExport } from './TextExport'
-import { importFromCSV } from '../lib/csv'
+import { importFromCSV, exportToCSV } from '../lib/csv'
 import { useTTS } from '../hooks/useTTS'
 import type { VoiceLang } from '../hooks/useSettings'
 import { getDueCards } from '../lib/mastery'
@@ -28,6 +28,7 @@ interface Props {
   onImport: (partials: Partial<WordCard>[]) => void
   onStudy: () => void
   onStudyNuance: () => void
+  onStudyCard: (card: WordCard) => void
   onBack: () => void
 }
 
@@ -48,6 +49,7 @@ export function WordList({
   onImport,
   onStudy,
   onStudyNuance,
+  onStudyCard,
   onBack,
 }: Props) {
   const [query, setQuery] = useState('')
@@ -57,6 +59,7 @@ export function WordList({
   const [showTextImport, setShowTextImport] = useState(false)
   const [showTextExport, setShowTextExport] = useState(false)
   const [showImportMenu, setShowImportMenu] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
@@ -184,7 +187,7 @@ export function WordList({
             className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-gray-50"
             title="インポート"
           >
-            <Upload size={16} />
+            <Download size={16} />
           </button>
           {showImportMenu && (
             <div className="absolute right-0 top-10 z-10 w-44 rounded-xl border bg-white py-1 shadow-lg">
@@ -198,19 +201,37 @@ export function WordList({
                 onClick={() => { csvRef.current?.click(); setShowImportMenu(false) }}
                 className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50"
               >
-                <Upload size={14} />CSVファイル
+                <Download size={14} />CSVファイル
               </button>
             </div>
           )}
         </div>
 
-        <button
-          onClick={() => setShowTextExport(true)}
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-gray-50"
-          title="エクスポート"
-        >
-          <Download size={16} />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowExportMenu((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-gray-50"
+            title="エクスポート"
+          >
+            <Upload size={16} />
+          </button>
+          {showExportMenu && (
+            <div className="absolute right-0 top-10 z-10 w-44 rounded-xl border bg-white py-1 shadow-lg">
+              <button
+                onClick={() => { setShowTextExport(true); setShowExportMenu(false) }}
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50"
+              >
+                <FileText size={14} />テキストエクスポート
+              </button>
+              <button
+                onClick={() => { exportToCSV(scopedCards); setShowExportMenu(false) }}
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50"
+              >
+                <Upload size={14} />CSVダウンロード
+              </button>
+            </div>
+          )}
+        </div>
 
         <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
       </div>
@@ -303,7 +324,10 @@ export function WordList({
                   className="accent-indigo-600 shrink-0"
                 />
               )}
-              <div className="min-w-0 flex-1">
+              <button
+                className="min-w-0 flex-1 text-left"
+                onClick={!selectMode ? () => onStudyCard(card) : undefined}
+              >
                 <div className="flex items-baseline gap-2">
                   <span className="truncate font-medium text-gray-900">{card.japanese}</span>
                   <span className="text-sm text-gray-400">→</span>
@@ -312,7 +336,7 @@ export function WordList({
                 <div className="mt-1">
                   <MasteryBadge level={card.masteryLevel} size="sm" />
                 </div>
-              </div>
+              </button>
               {!selectMode && (
                 <div className="flex shrink-0 items-center gap-1">
                   <button

@@ -74,7 +74,7 @@ export function TextImport({ onImport, onClose }: Props) {
         return {
           english: swapColumns ? col1 : col0,
           japanese: swapColumns ? col0 : col1,
-          notes: col2,
+          notes: col2 ? [col2] : [],
           images: [],
         }
       })
@@ -189,8 +189,8 @@ export function TextImport({ onImport, onClose }: Props) {
                     <span className="font-medium text-gray-800">{c.english}</span>
                     <span className="mx-2 text-gray-400">→</span>
                     <span className="text-gray-600">{c.japanese}</span>
-                    {c.notes && (
-                      <span className="ml-2 text-xs text-amber-600">[備考: {c.notes}]</span>
+                    {Array.isArray(c.notes) && c.notes[0] && (
+                      <span className="ml-2 text-xs text-amber-600">[備考: {c.notes[0]}]</span>
                     )}
                   </div>
                 ))}

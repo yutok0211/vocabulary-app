@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Volume2, ChevronLeft, RotateCcw, Check, X as XIcon, Pencil } from 'lucide-react'
+import { Volume2, ChevronLeft, RotateCcw, Check, X as XIcon, Pencil, Heart } from 'lucide-react'
 import type { WordCard, StudyDirection, Project } from '../types'
 import { getDueCards } from '../lib/mastery'
 import { MasteryBadge } from './MasteryBadge'
@@ -13,25 +13,32 @@ interface Props {
   direction: StudyDirection
   rate: number
   voiceLang: VoiceLang
+  skipSelection?: boolean
   onResult: (id: string, result: 'correct' | 'incorrect') => void
   onUpdate: (id: string, changes: Partial<WordCard>) => void
+  onToggleFavorite: (id: string) => void
   onBack: () => void
 }
 
 const COUNT_OPTIONS = [10, 20, 30, 50, 999]
 
-export function StudyMode({ cards, projects, direction, rate, voiceLang, onResult, onUpdate, onBack }: Props) {
+export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSelection, onResult, onUpdate, onToggleFavorite, onBack }: Props) {
   const due = getDueCards(cards)
   const { speak } = useTTS(rate, voiceLang)
 
-  const [selectedCount, setSelectedCount] = useState<number | null>(null)
-  const [queue, setQueue] = useState<WordCard[]>([])
+  const [selectedCount, setSelectedCount] = useState<number | null>(() =>
+    skipSelection ? cards.length : null
+  )
+  const [queue, setQueue] = useState<WordCard[]>(() =>
+    skipSelection ? [...cards] : []
+  )
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [done, setDone] = useState(false)
   // 現ラウンドの不正解ID
   const [wrongInRound, setWrongInRound] = useState<Set<string>>(new Set())
   const [editingCard, setEditingCard] = useState<WordCard | null>(null)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   // 累計ラウンド数
   const [round, setRound] = useState(1)
   // 累計正解・不正解カウント（セッション全体）
@@ -57,20 +64,21 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, onResul
   const current = queue[index]
 
   useEffect(() => {
-    if (!current || selectedCount === null) return
+    if (selectedCount === null) return
     setFlipped(false)
-  }, [index, current, selectedCount])
+  }, [index, selectedCount])
 
-  // 英語面が表示されたとき自動読み上げ
+  // 問題面表示時に自動読み上げ（indexが変わるたびに問題面なので flipped チェック不要）
   useEffect(() => {
-    if (!current || flipped || selectedCount === null) return
-    if (direction === 'en-to-ja') {
-      const timer = setTimeout(() => speak(current.english, 'en'), 300)
-      return () => clearTimeout(timer)
-    }
-  }, [index, flipped, current, direction, selectedCount, speak])
+    if (!current || selectedCount === null) return
+    const text = direction === 'en-to-ja' ? current.english : current.japanese
+    const lang = direction === 'en-to-ja' ? 'en' : 'ja'
+    const timer = setTimeout(() => speak(text, lang), 300)
+    return () => clearTimeout(timer)
+  }, [index, selectedCount]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (due.length === 0) {
+
+  if (!skipSelection && due.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
         <div className="text-5xl">🎉</div>
@@ -84,7 +92,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, onResul
   }
 
   // 枚数選択画面
-  if (selectedCount === null) {
+  if (!skipSelection && selectedCount === null) {
     return (
       <div className="flex flex-col gap-6">
         <div className="flex items-center">
@@ -128,7 +136,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, onResul
         </p>
         <div className="mt-4 flex gap-3">
           <button
-            onClick={() => startStudy(selectedCount)}
+            onClick={() => startStudy(selectedCount ?? due.length)}
             className="flex items-center gap-2 rounded-xl border px-5 py-2.5 hover:bg-gray-50"
           >
             <RotateCcw size={16} />もう一度
@@ -143,7 +151,6 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, onResul
 
   const front = direction === 'ja-to-en' ? current.japanese : current.english
   const back = direction === 'ja-to-en' ? current.english : current.japanese
-  const backLang = direction === 'ja-to-en' ? 'en' : 'ja'
 
   const handleResult = (result: 'correct' | 'incorrect') => {
     onResult(current.id, result)
@@ -182,9 +189,17 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, onResul
         <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-800">
           <ChevronLeft size={20} />戻る
         </button>
-        <div className="text-center text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          {index > 0 && (
+            <button
+              onClick={() => { setIndex((i) => i - 1); setFlipped(false) }}
+              className="flex items-center gap-0.5 rounded-lg border px-2 py-1 text-xs hover:bg-gray-50"
+            >
+              <ChevronLeft size={14} />前へ
+            </button>
+          )}
           <span>{index + 1} / {queue.length}</span>
-          {round > 1 && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">ラウンド {round}</span>}
+          {round > 1 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">ラウンド {round}</span>}
         </div>
         <MasteryBadge level={current.masteryLevel} size="sm" />
       </div>
@@ -227,7 +242,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, onResul
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    speak(back, backLang)
+                    speak(current.english, 'en')
                   }}
                   className="rounded-lg p-1.5 text-indigo-400 hover:bg-indigo-50"
                 >
@@ -235,17 +250,42 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, onResul
                 </button>
               </div>
             </div>
-            {current.notes && (
-              <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{current.notes}</div>
+            {current.notes.length > 0 && (
+              <div className="space-y-2">
+                {current.notes.map((note, i) => note.trim() && (
+                  <div key={i} className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800 whitespace-pre-wrap">{note}</div>
+                ))}
+              </div>
             )}
             {current.images.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {current.images.map((src, i) => (
-                  <img key={i} src={src} alt="" className="h-28 rounded-lg border object-cover" />
+                  <img
+                    key={i}
+                    src={src}
+                    alt=""
+                    className="h-28 rounded-lg border object-cover cursor-pointer hover:opacity-90"
+                    onClick={(e) => { e.stopPropagation(); setLightboxSrc(src) }}
+                  />
                 ))}
               </div>
             )}
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleFavorite(current.id)
+                  setQueue((q) => q.map((c) => c.id === current.id ? { ...c, isFavorite: !c.isFavorite } : c))
+                }}
+                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                  current.isFavorite
+                    ? 'border-pink-300 bg-pink-50 text-pink-600'
+                    : 'border-gray-200 text-gray-400 hover:bg-pink-50 hover:text-pink-500'
+                }`}
+              >
+                <Heart size={14} fill={current.isFavorite ? 'currentColor' : 'none'} />
+                {current.isFavorite ? 'お気に入り済' : 'お気に入り'}
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); setEditingCard(current) }}
                 className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-50 hover:text-indigo-600"
@@ -264,12 +304,25 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, onResul
           existingGroupIds={Array.from(new Set(cards.map((c) => c.groupId).filter(Boolean)))}
           onSave={(changes) => {
             onUpdate(editingCard.id, changes)
-            // queue内のカードも更新
-            setQueue((q) => q.map((c) => c.id === editingCard.id ? { ...c, ...changes } : c))
             setEditingCard(null)
           }}
           onClose={() => setEditingCard(null)}
         />
+      )}
+
+      {lightboxSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={() => setLightboxSrc(null)}
+        >
+          <img src={lightboxSrc} alt="" className="max-h-full max-w-full rounded-lg object-contain" />
+          <button
+            onClick={() => setLightboxSrc(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/40"
+          >
+            <XIcon size={24} />
+          </button>
+        </div>
       )}
 
       {/* 結果ボタン */}

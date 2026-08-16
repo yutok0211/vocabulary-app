@@ -25,6 +25,27 @@ export function saveLocal(cards: WordCard[]): void {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(cards))
 }
 
+// 1枚だけ差し替え（全件書き直しより高速）
+export function patchLocal(card: WordCard): void {
+  try {
+    const cards: WordCard[] = JSON.parse(localStorage.getItem(LOCAL_KEY) ?? '[]')
+    const idx = cards.findIndex((c) => c.id === card.id)
+    if (idx >= 0) cards[idx] = card
+    else cards.push(card)
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(cards))
+  } catch {
+    // fallback: no-op (Firebase が正とみなす)
+  }
+}
+
+// 削除
+export function removeLocal(cardId: string): void {
+  try {
+    const cards: WordCard[] = JSON.parse(localStorage.getItem(LOCAL_KEY) ?? '[]')
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(cards.filter((c) => c.id !== cardId)))
+  } catch { /* no-op */ }
+}
+
 export function loadLocalProjects(): Project[] {
   try {
     return JSON.parse(localStorage.getItem(LOCAL_PROJECTS_KEY) ?? '[]')

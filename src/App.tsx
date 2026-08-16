@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BookOpen, LogOut, CloudOff, Cloud, Settings } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useCards } from './hooks/useCards'
@@ -19,10 +19,19 @@ type View = 'modes' | 'projects' | 'list' | 'study' | 'nuance'
 export default function App() {
   const { user, loading, login, register, logout } = useAuth()
   const [skipped, setSkipped] = useState(false)
-  const [view, setView] = useState<View>('modes')
+  const [view, setView] = useState<View>(() => {
+    const saved = sessionStorage.getItem('vocab_view') as View | null
+    return saved ?? 'modes'
+  })
   const [appMode, setAppMode] = useState<AppMode>('flashcard')
   const [showSettings, setShowSettings] = useState(false)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | 'favorites'>('')
+  const [selectedProjectId, setSelectedProjectId] = useState<string | 'favorites'>(() => {
+    return sessionStorage.getItem('vocab_project_id') ?? ''
+  })
+  const [studyCardId, setStudyCardId] = useState<string | null>(null)
+
+  useEffect(() => { sessionStorage.setItem('vocab_view', view) }, [view])
+  useEffect(() => { sessionStorage.setItem('vocab_project_id', selectedProjectId) }, [selectedProjectId])
 
   const { rate, setRate, direction, setDirection, voiceLang, setVoiceLang } = useSettings()
 
@@ -53,6 +62,11 @@ export default function App() {
       : selectedProjectId === ''
       ? cards
       : cards.filter((c) => c.projectId === selectedProjectId)
+
+  // 学習対象カード（単一カード指定 or スコープ全体）
+  const studyCards = studyCardId
+    ? cards.filter((c) => c.id === studyCardId)
+    : scopedCards
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -136,21 +150,24 @@ export default function App() {
             onDeleteMany={deleteMany}
             onToggleFavorite={toggleFavorite}
             onImport={importCards}
-            onStudy={() => setView('study')}
+            onStudy={() => { setStudyCardId(null); setView('study') }}
             onStudyNuance={() => setView('nuance')}
+            onStudyCard={(card) => { setStudyCardId(card.id); setView('study') }}
             onBack={() => setView('projects')}
           />
         )}
         {view === 'study' && (
           <StudyMode
-            cards={scopedCards}
+            cards={studyCards}
             projects={projects}
             direction={direction}
             rate={rate}
             voiceLang={voiceLang}
+            skipSelection={!!studyCardId}
             onResult={recordResult}
             onUpdate={updateCard}
-            onBack={() => setView('list')}
+            onToggleFavorite={toggleFavorite}
+            onBack={() => { setStudyCardId(null); setView('list') }}
           />
         )}
         {view === 'nuance' && (

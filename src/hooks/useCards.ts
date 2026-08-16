@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { WordCard } from '../types'
-import { loadLocal, saveLocal, saveCardRemote, deleteCardRemote, subscribeCards } from '../lib/storage'
+import { loadLocal, saveLocal, patchLocal, removeLocal, saveCardRemote, deleteCardRemote, subscribeCards } from '../lib/storage'
 import { updateMastery } from '../lib/mastery'
 import type { StudyResult } from '../types'
 
@@ -10,7 +10,7 @@ function newCard(partial: Partial<WordCard>): WordCard {
     id: crypto.randomUUID(),
     japanese: '',
     english: '',
-    notes: '',
+    notes: [],
     images: [],
     masteryLevel: 0,
     nextReviewDate: now,
@@ -28,7 +28,12 @@ function newCard(partial: Partial<WordCard>): WordCard {
 }
 
 export function useCards(userId: string | null) {
-  const [cards, setCards] = useState<WordCard[]>(() => loadLocal())
+  const [cards, setCards] = useState<WordCard[]>(() =>
+    loadLocal().map((c) => ({
+      ...c,
+      notes: Array.isArray(c.notes) ? c.notes : (c.notes ? [c.notes as unknown as string] : []),
+    }))
+  )
 
   useEffect(() => {
     if (!userId) return
@@ -41,6 +46,7 @@ export function useCards(userId: string | null) {
         groupId: c.groupId ?? '',
         degreeRank: c.degreeRank ?? 0,
         exampleSentence: c.exampleSentence ?? '',
+        notes: Array.isArray(c.notes) ? c.notes : (c.notes ? [c.notes as unknown as string] : []),
       }))
       setCards(normalized)
       saveLocal(normalized)
@@ -51,7 +57,14 @@ export function useCards(userId: string | null) {
   const persist = useCallback(
     (updated: WordCard[], changedCard?: WordCard, deleted?: string) => {
       setCards(updated)
-      saveLocal(updated)
+      // 1枚変更の場合は差分書き込みでUI をブロックしない
+      if (changedCard && !deleted) {
+        patchLocal(changedCard)
+      } else if (deleted && !changedCard) {
+        removeLocal(deleted)
+      } else {
+        saveLocal(updated)
+      }
       if (userId) {
         if (changedCard) saveCardRemote(userId, changedCard)
         if (deleted) deleteCardRemote(userId, deleted)
@@ -92,7 +105,7 @@ export function useCards(userId: string | null) {
       const idSet = new Set(ids)
       const updated = cards.filter((c) => !idSet.has(c.id))
       setCards(updated)
-      saveLocal(updated)
+      ids.forEach((id) => removeLocal(id))
       if (userId) ids.forEach((id) => deleteCardRemote(userId, id))
     },
     [cards, userId],

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Image, Trash2 } from 'lucide-react'
+import { X, Image, Trash2, Plus } from 'lucide-react'
 import type { WordCard, Project } from '../types'
 import { getMasteryLabel, getMasteryColor } from '../lib/mastery'
 import { MASTERY_INTERVALS } from '../types'
@@ -15,7 +15,9 @@ interface Props {
 export function CardEditor({ card, projects, existingGroupIds = [], onSave, onClose }: Props) {
   const [japanese, setJapanese] = useState(card.japanese ?? '')
   const [english, setEnglish] = useState(card.english ?? '')
-  const [notes, setNotes] = useState(card.notes ?? '')
+  const [notesList, setNotesList] = useState<string[]>(
+    Array.isArray(card.notes) ? (card.notes.length > 0 ? card.notes : ['']) : (card.notes ? [card.notes as unknown as string] : [''])
+  )
   const [images, setImages] = useState<string[]>(card.images ?? [])
   const [masteryLevel, setMasteryLevel] = useState<number>(card.masteryLevel ?? 0)
   const [projectId, setProjectId] = useState<string>(card.projectId ?? '')
@@ -24,26 +26,28 @@ export function CardEditor({ card, projects, existingGroupIds = [], onSave, onCl
   const [exampleSentence, setExampleSentence] = useState(card.exampleSentence ?? '')
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const addImageBlob = (blob: Blob) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const data = e.target?.result as string
+      if (data) setImages((prev) => [...prev, data])
+    }
+    reader.readAsDataURL(blob)
+  }
+
   const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? [])
-    files.forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = (ev) => setImages((prev) => [...prev, ev.target!.result as string])
-      reader.readAsDataURL(file)
-    })
+    Array.from(e.target.files ?? []).forEach((file) => addImageBlob(file))
     e.target.value = ''
   }
 
   const handlePaste = (e: React.ClipboardEvent) => {
-    Array.from(e.clipboardData.items).forEach((item) => {
-      if (!item.type.startsWith('image/')) return
+    const imageItems = Array.from(e.clipboardData.items).filter((item) => item.type.startsWith('image/'))
+    imageItems.forEach((item) => {
       const file = item.getAsFile()
-      if (!file) return
-      const reader = new FileReader()
-      reader.onload = (ev) => setImages((prev) => [...prev, ev.target!.result as string])
-      reader.readAsDataURL(file)
+      if (file) addImageBlob(file)
     })
   }
+
 
   const handleSave = () => {
     if (!japanese.trim() || !english.trim()) return
@@ -55,7 +59,7 @@ export function CardEditor({ card, projects, existingGroupIds = [], onSave, onCl
     onSave({
       japanese: japanese.trim(),
       english: english.trim(),
-      notes,
+      notes: notesList.filter((n) => n.trim()),
       images,
       masteryLevel,
       nextReviewDate,
@@ -100,14 +104,38 @@ export function CardEditor({ card, projects, existingGroupIds = [], onSave, onCl
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">備考・解説</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="例文、語源、覚え方など..."
-            />
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">備考・解説</label>
+              <button
+                type="button"
+                onClick={() => setNotesList((prev) => [...prev, ''])}
+                className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs hover:bg-gray-50"
+              >
+                <Plus size={12} />追加
+              </button>
+            </div>
+            <div className="space-y-2">
+              {notesList.map((note, i) => (
+                <div key={i} className="flex gap-2">
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNotesList((prev) => prev.map((n, j) => j === i ? e.target.value : n))}
+                    rows={2}
+                    className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="例文、語源、覚え方など..."
+                  />
+                  {notesList.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setNotesList((prev) => prev.filter((_, j) => j !== i))}
+                      className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* ニュアンス比較モード */}

@@ -37,7 +37,7 @@ export function importFromCSV(file: File): Promise<Partial<WordCard>[]> {
           .map((row) => ({
             japanese: row.japanese ?? '',
             english: row.english ?? '',
-            notes: row.notes ?? '',
+            notes: row.notes ? [row.notes] : [],
             masteryLevel: parseInt(row.masteryLevel ?? '0', 10) || 0,
             reviewCount: parseInt(row.reviewCount ?? '0', 10) || 0,
             correctCount: parseInt(row.correctCount ?? '0', 10) || 0,

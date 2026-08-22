@@ -20,6 +20,7 @@ function newCard(partial: Partial<WordCard>): WordCard {
     updatedAt: now,
     isFavorite: false,
     projectId: '',
+    cardType: 'flashcard',
     groupId: '',
     degreeRank: 0,
     exampleSentence: '',
@@ -27,27 +28,28 @@ function newCard(partial: Partial<WordCard>): WordCard {
   }
 }
 
+function normalizeCard(c: WordCard): WordCard {
+  return {
+    ...c,
+    cardType: c.cardType ?? (c.groupId ? 'nuance' : 'flashcard'),
+    notes: Array.isArray(c.notes) ? c.notes : (c.notes ? [c.notes as unknown as string] : []),
+    isFavorite: c.isFavorite ?? false,
+    projectId: c.projectId ?? '',
+    groupId: c.groupId ?? '',
+    degreeRank: c.degreeRank ?? 0,
+    exampleSentence: c.exampleSentence ?? '',
+  }
+}
+
 export function useCards(userId: string | null) {
   const [cards, setCards] = useState<WordCard[]>(() =>
-    loadLocal().map((c) => ({
-      ...c,
-      notes: Array.isArray(c.notes) ? c.notes : (c.notes ? [c.notes as unknown as string] : []),
-    }))
+    loadLocal().map(normalizeCard)
   )
 
   useEffect(() => {
     if (!userId) return
     const unsub = subscribeCards(userId, (remote) => {
-      // 既存カードに新フィールドがない場合デフォルト補完
-      const normalized = remote.map((c) => ({
-        ...c,
-        isFavorite: c.isFavorite ?? false,
-        projectId: c.projectId ?? '',
-        groupId: c.groupId ?? '',
-        degreeRank: c.degreeRank ?? 0,
-        exampleSentence: c.exampleSentence ?? '',
-        notes: Array.isArray(c.notes) ? c.notes : (c.notes ? [c.notes as unknown as string] : []),
-      }))
+      const normalized = remote.map(normalizeCard)
       setCards(normalized)
       saveLocal(normalized)
     })

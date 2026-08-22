@@ -8,11 +8,12 @@ interface Props {
   card: Partial<WordCard>
   projects: Project[]
   existingGroupIds?: string[]
+  mode?: 'flashcard' | 'nuance'
   onSave: (changes: Partial<WordCard>) => void
   onClose: () => void
 }
 
-export function CardEditor({ card, projects, existingGroupIds = [], onSave, onClose }: Props) {
+export function CardEditor({ card, projects, existingGroupIds = [], mode = 'flashcard', onSave, onClose }: Props) {
   const [japanese, setJapanese] = useState(card.japanese ?? '')
   const [english, setEnglish] = useState(card.english ?? '')
   const [notesList, setNotesList] = useState<string[]>(
@@ -64,9 +65,10 @@ export function CardEditor({ card, projects, existingGroupIds = [], onSave, onCl
       masteryLevel,
       nextReviewDate,
       projectId,
-      groupId: groupId.trim(),
-      degreeRank,
-      exampleSentence: exampleSentence.trim(),
+      cardType: mode,
+      groupId: mode === 'nuance' ? groupId.trim() : '',
+      degreeRank: mode === 'nuance' ? degreeRank : 0,
+      exampleSentence: mode === 'nuance' ? exampleSentence.trim() : '',
     })
     onClose()
   }
@@ -138,8 +140,8 @@ export function CardEditor({ card, projects, existingGroupIds = [], onSave, onCl
             </div>
           </div>
 
-          {/* ニュアンス比較モード */}
-          <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3">
+          {/* ニュアンス比較モード（ニュアンスモード時のみ） */}
+          {mode === 'nuance' && <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3">
             <p className="mb-2 text-sm font-medium text-gray-700">ニュアンス比較モード（任意）</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -184,7 +186,7 @@ export function CardEditor({ card, projects, existingGroupIds = [], onSave, onCl
                 クイズ出題時、文中の英単語部分が自動で空欄になります。同じグループ・2枚以上のカードで設定するとニュアンス比較モードに出題されます。
               </p>
             </div>
-          </div>
+          </div>}
 
           {/* プロジェクト */}
           {projects.length > 0 && (

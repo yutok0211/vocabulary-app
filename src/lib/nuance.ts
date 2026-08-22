@@ -9,6 +9,7 @@ export interface NuanceGroup {
 export function getNuanceGroups(cards: WordCard[]): NuanceGroup[] {
   const map = new Map<string, WordCard[]>()
   for (const c of cards) {
+    if ((c.cardType ?? 'flashcard') !== 'nuance') continue
     if (!c.groupId || !c.degreeRank) continue
     if (!map.has(c.groupId)) map.set(c.groupId, [])
     map.get(c.groupId)!.push(c)

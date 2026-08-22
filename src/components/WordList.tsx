@@ -67,13 +67,16 @@ export function WordList({
   const csvRef = useRef<HTMLInputElement>(null)
   const { speak } = useTTS(rate, voiceLang)
 
-  // プロジェクト/お気に入りでフィルタ
-  const scopedCards =
-    projectId === 'favorites'
-      ? cards.filter((c) => c.isFavorite)
-      : projectId === ''
-      ? cards
-      : cards.filter((c) => c.projectId === projectId)
+  // プロジェクト/お気に入りでフィルタ、さらに現在のモードのカードのみ表示
+  const scopedCards = (() => {
+    const byProject =
+      projectId === 'favorites'
+        ? cards.filter((c) => c.isFavorite)
+        : projectId === ''
+        ? cards
+        : cards.filter((c) => c.projectId === projectId)
+    return byProject.filter((c) => (c.cardType ?? 'flashcard') === mode)
+  })()
 
   const filtered = scopedCards.filter(
     (c) =>
@@ -100,6 +103,7 @@ export function WordList({
     const withProject = partials.map((p) => ({
       ...p,
       projectId: projectId === 'favorites' ? '' : projectId,
+      cardType: mode,
     }))
     onImport(withProject)
     e.target.value = ''
@@ -372,10 +376,11 @@ export function WordList({
 
       {adding && (
         <CardEditor
-          card={{ projectId: projectId === 'favorites' ? '' : projectId }}
+          card={{ projectId: projectId === 'favorites' ? '' : projectId, cardType: mode }}
           projects={projects}
           existingGroupIds={existingGroupIds}
-          onSave={(changes) => onAdd(changes)}
+          mode={mode}
+          onSave={(changes) => onAdd({ ...changes, cardType: mode })}
           onClose={() => setAdding(false)}
         />
       )}
@@ -384,6 +389,7 @@ export function WordList({
           card={editing}
           projects={projects}
           existingGroupIds={existingGroupIds}
+          mode={mode}
           onSave={(changes) => onUpdate(editing.id, changes)}
           onClose={() => setEditing(null)}
         />
@@ -394,6 +400,7 @@ export function WordList({
             const withProject = partials.map((p) => ({
               ...p,
               projectId: projectId === 'favorites' ? '' : projectId,
+              cardType: mode,
             }))
             onImport(withProject)
           }}

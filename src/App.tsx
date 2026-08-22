@@ -23,7 +23,10 @@ export default function App() {
     const saved = sessionStorage.getItem('vocab_view') as View | null
     return saved ?? 'modes'
   })
-  const [appMode, setAppMode] = useState<AppMode>('flashcard')
+  const [appMode, setAppMode] = useState<AppMode>(() => {
+    const saved = sessionStorage.getItem('vocab_app_mode') as AppMode | null
+    return saved ?? 'flashcard'
+  })
   const [showSettings, setShowSettings] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string | 'favorites'>(() => {
     return sessionStorage.getItem('vocab_project_id') ?? ''
@@ -31,6 +34,7 @@ export default function App() {
   const [studyCardId, setStudyCardId] = useState<string | null>(null)
 
   useEffect(() => { sessionStorage.setItem('vocab_view', view) }, [view])
+  useEffect(() => { sessionStorage.setItem('vocab_app_mode', appMode) }, [appMode])
   useEffect(() => { sessionStorage.setItem('vocab_project_id', selectedProjectId) }, [selectedProjectId])
 
   const { rate, setRate, direction, setDirection, voiceLang, setVoiceLang } = useSettings()
@@ -55,13 +59,16 @@ export default function App() {
     return <AuthScreen onLogin={login} onRegister={register} onSkip={() => setSkipped(true)} />
   }
 
-  // 現在のプロジェクトでフィルタされたカード
-  const scopedCards =
-    selectedProjectId === 'favorites'
-      ? cards.filter((c) => c.isFavorite)
-      : selectedProjectId === ''
-      ? cards
-      : cards.filter((c) => c.projectId === selectedProjectId)
+  // 現在のモード＋プロジェクトでフィルタされたカード
+  const scopedCards = (() => {
+    const byProject =
+      selectedProjectId === 'favorites'
+        ? cards.filter((c) => c.isFavorite)
+        : selectedProjectId === ''
+        ? cards
+        : cards.filter((c) => c.projectId === selectedProjectId)
+    return byProject.filter((c) => (c.cardType ?? 'flashcard') === appMode)
+  })()
 
   // 学習対象カード（単一カード指定 or スコープ全体）
   const studyCards = studyCardId

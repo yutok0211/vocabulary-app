@@ -12,6 +12,7 @@ export interface WordCard {
   updatedAt: string
   isFavorite: boolean
   projectId: string // '' = 未分類
+  cardType: 'flashcard' | 'nuance' // モード別データ分離
   groupId: string // '' = 未グループ。ニュアンス比較モード用（例: 'delicious系'）
   degreeRank: number // 0 = 未設定。1〜6でグループ内の強度ランク
   exampleSentence: string // ニュアンス比較モードの出題文。対象の英単語を含む例文

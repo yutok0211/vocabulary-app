@@ -79,6 +79,30 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
   const [totalCorrect, setTotalCorrect] = useState(0)
   const [totalWrong, setTotalWrong] = useState(0)
 
+  // カードがロードされたらキューを再構築（リロード直後にFirestoreが遅延する場合の対策）
+  useEffect(() => {
+    if (skipSelection || queue.length > 0 || selectedCount === null) return
+    const saved = localStorage.getItem(LS_QUEUE)
+    if (!saved) return
+    try {
+      const savedIds: string[] = JSON.parse(saved)
+      if (savedIds.length === 0 || cards.length === 0) return
+      const cardMap = new Map(cards.map((c) => [c.id, c]))
+      const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
+      if (restored.length === savedIds.length) {
+        setQueue(restored)
+        setIndex(Number(localStorage.getItem(LS_INDEX) ?? 0))
+        setFlipped(localStorage.getItem(LS_FLIPPED) === 'true')
+      } else {
+        clearStudyState()
+        setSelectedCount(null)
+      }
+    } catch {
+      clearStudyState()
+      setSelectedCount(null)
+    }
+  }, [cards]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // 状態変化のたびに保存
   useEffect(() => {
     if (queue.length > 0 && selectedCount !== null) {
@@ -104,7 +128,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
     [due],
   )
 
-  const current = queue[index]
+  const current = queue[index] ?? null
 
   useEffect(() => {
     if (selectedCount === null) return
@@ -130,6 +154,15 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
         <button onClick={onBack} className="mt-4 rounded-xl bg-indigo-600 px-6 py-2.5 text-white hover:bg-indigo-700">
           一覧へ戻る
         </button>
+      </div>
+    )
+  }
+
+  // カードロード待ち（Firestore遅延 or キュー復元中）
+  if (selectedCount !== null && !done && current === null) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
       </div>
     )
   }

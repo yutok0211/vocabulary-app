@@ -20,22 +20,28 @@ export default function App() {
   const { user, loading, login, register, logout } = useAuth()
   const [skipped, setSkipped] = useState(false)
   const [view, setView] = useState<View>(() => {
-    const saved = sessionStorage.getItem('vocab_view') as View | null
+    const saved = localStorage.getItem('vocab_view') as View | null
     return saved ?? 'modes'
   })
   const [appMode, setAppMode] = useState<AppMode>(() => {
-    const saved = sessionStorage.getItem('vocab_app_mode') as AppMode | null
+    const saved = localStorage.getItem('vocab_app_mode') as AppMode | null
     return saved ?? 'flashcard'
   })
   const [showSettings, setShowSettings] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string | 'favorites'>(() => {
-    return sessionStorage.getItem('vocab_project_id') ?? ''
+    return localStorage.getItem('vocab_project_id') ?? ''
   })
-  const [studyCardId, setStudyCardId] = useState<string | null>(null)
+  const [studyCardId, setStudyCardId] = useState<string | null>(() => {
+    return localStorage.getItem('vocab_study_card_id') ?? null
+  })
 
-  useEffect(() => { sessionStorage.setItem('vocab_view', view) }, [view])
-  useEffect(() => { sessionStorage.setItem('vocab_app_mode', appMode) }, [appMode])
-  useEffect(() => { sessionStorage.setItem('vocab_project_id', selectedProjectId) }, [selectedProjectId])
+  useEffect(() => { localStorage.setItem('vocab_view', view) }, [view])
+  useEffect(() => { localStorage.setItem('vocab_app_mode', appMode) }, [appMode])
+  useEffect(() => { localStorage.setItem('vocab_project_id', selectedProjectId) }, [selectedProjectId])
+  useEffect(() => {
+    if (studyCardId) localStorage.setItem('vocab_study_card_id', studyCardId)
+    else localStorage.removeItem('vocab_study_card_id')
+  }, [studyCardId])
 
   const { rate, setRate, direction, setDirection, voiceLang, setVoiceLang } = useSettings()
 

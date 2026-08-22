@@ -2,6 +2,13 @@ import { Component, type ReactNode } from 'react'
 
 interface State { error: Error | null }
 
+// 学習セッションのキーのみ削除（ナビゲーション状態は保持）
+function clearStudyKeys() {
+  ['vocab_study_queue', 'vocab_study_index', 'vocab_study_flipped', 'vocab_study_count'].forEach(
+    (k) => localStorage.removeItem(k),
+  )
+}
+
 export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { error: null }
 
@@ -10,8 +17,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   }
 
   handleReset = () => {
-    // localStorage をクリアしてリセット
-    localStorage.clear()
+    clearStudyKeys() // 学習状態のみクリア（vocab_view などは保持）
     this.setState({ error: null })
     window.location.reload()
   }

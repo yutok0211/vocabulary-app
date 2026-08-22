@@ -53,7 +53,8 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
   })
   const [queue, setQueue] = useState<WordCard[]>(() => {
     if (skipSelection) return [...cards]
-    const savedIds: string[] = JSON.parse(localStorage.getItem(LS_QUEUE) ?? '[]')
+    let savedIds: string[] = []
+    try { savedIds = JSON.parse(localStorage.getItem(LS_QUEUE) ?? '[]') } catch { clearStudyState() }
     if (savedIds.length === 0) return []
     const cardMap = new Map(cards.map((c) => [c.id, c]))
     const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]

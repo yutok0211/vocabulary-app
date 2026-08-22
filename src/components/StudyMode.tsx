@@ -165,7 +165,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
     )
   }
 
-  if (!skipSelection && due.length === 0) {
+  if (!skipSelection && selectedCount === null && due.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
         <div className="text-5xl">🎉</div>

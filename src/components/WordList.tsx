@@ -273,11 +273,24 @@ export function WordList({
       {/* 選択モード起動 / 選択バー */}
       {selectMode ? (
         <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-indigo-700">
               <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} className="accent-indigo-600" />
               全て選択
             </label>
+            <button
+              onClick={() => {
+                const today = new Date().toISOString().slice(0, 10)
+                setSelected((prev) => {
+                  const next = new Set(prev)
+                  filtered.filter((c) => c.createdAt?.startsWith(today)).forEach((c) => next.add(c.id))
+                  return next
+                })
+              }}
+              className="rounded-lg border border-indigo-300 px-2.5 py-1 text-xs text-indigo-700 hover:bg-indigo-100"
+            >
+              本日追加を選択
+            </button>
             <span className="text-sm text-indigo-500">{selected.size} 件選択中</span>
           </div>
           <div className="flex items-center gap-2">

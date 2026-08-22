@@ -81,12 +81,23 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
 
   // カードがロードされたらキューを再構築（リロード直後にFirestoreが遅延する場合の対策）
   useEffect(() => {
-    if (skipSelection || queue.length > 0 || selectedCount === null) return
+    if (cards.length === 0) return
+    if (skipSelection) {
+      // 単一カードタップモード: cardsが届いたらキューをセット
+      if (queue.length === 0) {
+        setQueue([...cards])
+        setSelectedCount(cards.length)
+        setIndex(0)
+      }
+      return
+    }
+    // 通常モード: localStorage からキューを復元
+    if (queue.length > 0 || selectedCount === null) return
     const saved = localStorage.getItem(LS_QUEUE)
     if (!saved) return
     try {
       const savedIds: string[] = JSON.parse(saved)
-      if (savedIds.length === 0 || cards.length === 0) return
+      if (savedIds.length === 0) return
       const cardMap = new Map(cards.map((c) => [c.id, c]))
       const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
       if (restored.length === savedIds.length) {

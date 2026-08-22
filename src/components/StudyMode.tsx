@@ -125,6 +125,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
     (count: number) => {
       const shuffled = shuffle([...due])
       const newQueue = count >= due.length ? shuffled : shuffled.slice(0, count)
+      if (newQueue.length === 0) return
       setQueue(newQueue)
       setSelectedCount(count)
       setIndex(0)

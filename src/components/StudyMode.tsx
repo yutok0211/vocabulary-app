@@ -162,18 +162,11 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
   }, [flipped]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
-  // カードロード待ち（Firestore遅延 or キュー復元中）- due.length===0チェックより先に実施
-  if (cards.length === 0) {
-    return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
-        <p className="text-sm text-gray-400">カードを読み込み中...</p>
-        <button onClick={onBack} className="mt-2 text-sm text-indigo-600 underline">
-          戻る
-        </button>
-      </div>
-    )
-  }
+  useEffect(() => {
+    if (cards.length === 0) onBack()
+  }, [cards.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (cards.length === 0) return null
 
   if (!skipSelection && selectedCount === null && due.length === 0) {
     return (

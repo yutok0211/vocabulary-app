@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, Heart, BookOpen, Layers, ChevronLeft } from 'lucide-react'
-import type { Project, WordCard, AppMode } from '../types'
+import type { Project, WordCard, AppMode, StudyDirection } from '../types'
 import { getDueCards } from '../lib/mastery'
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
   mode: AppMode
   onSelectProject: (projectId: string | 'favorites') => void
   onAddProject: (name: string) => void
-  onUpdateProject: (id: string, name: string) => void
+  onUpdateProject: (id: string, changes: Partial<Pick<Project, 'name' | 'direction'>>) => void
   onDeleteProject: (id: string) => void
   onBack: () => void
 }
@@ -48,8 +48,13 @@ export function ProjectList({
 
   const handleUpdate = () => {
     if (!editingId || !editingName.trim()) return
-    onUpdateProject(editingId, editingName.trim())
+    onUpdateProject(editingId, { name: editingName.trim() })
     setEditingId(null)
+  }
+
+  const toggleDirection = (p: Project) => {
+    const next: StudyDirection = (p.direction ?? 'ja-to-en') === 'ja-to-en' ? 'en-to-ja' : 'ja-to-en'
+    onUpdateProject(p.id, { direction: next })
   }
 
   return (
@@ -146,6 +151,13 @@ export function ProjectList({
                       <p className="font-medium text-gray-800 truncate">{p.name}</p>
                       <p className="text-xs text-gray-400">{stats.total} 枚{stats.due > 0 && ` • ${stats.due} 枚復習待ち`}</p>
                     </div>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleDirection(p) }}
+                    className="shrink-0 rounded-lg border px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300"
+                    title="出題方向を切り替え"
+                  >
+                    {(p.direction ?? 'ja-to-en') === 'ja-to-en' ? '日→英' : '英→日'}
                   </button>
                   <button
                     onClick={() => { setEditingId(p.id); setEditingName(p.name) }}

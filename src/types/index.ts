@@ -21,6 +21,7 @@ export interface WordCard {
 export interface Project {
   id: string
   name: string
+  direction?: StudyDirection // プロジェクト個別の出題方向
   createdAt: string
   updatedAt: string
 }

@@ -146,14 +146,19 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
     setFlipped(false)
   }, [index, selectedCount])
 
-  // 問題面表示時に自動読み上げ（indexが変わるたびに問題面なので flipped チェック不要）
+  // 英→日: カード表示時に英語を読み上げ
   useEffect(() => {
-    if (!current || selectedCount === null) return
-    const text = direction === 'en-to-ja' ? current.english : current.japanese
-    const lang = direction === 'en-to-ja' ? 'en' : 'ja'
-    const timer = setTimeout(() => speak(text, lang), 300)
+    if (!current || selectedCount === null || direction !== 'en-to-ja') return
+    const timer = setTimeout(() => speak(current.english, 'en'), 300)
     return () => clearTimeout(timer)
   }, [index, selectedCount]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 日→英: カードをめくった時（英語が表示された時）に読み上げ
+  useEffect(() => {
+    if (!current || selectedCount === null || direction !== 'ja-to-en' || !flipped) return
+    const timer = setTimeout(() => speak(current.english, 'en'), 300)
+    return () => clearTimeout(timer)
+  }, [flipped]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // カードロード待ち（Firestore遅延 or キュー復元中）- due.length===0チェックより先に実施

@@ -43,7 +43,7 @@ export default function App() {
     else localStorage.removeItem('vocab_study_card_id')
   }, [studyCardId])
 
-  const { rate, setRate, direction, setDirection, voiceLang, setVoiceLang } = useSettings()
+  const { rate, setRate, direction: globalDirection, setDirection, voiceLang, setVoiceLang } = useSettings()
 
   const userId = user?.uid ?? null
   const { cards, addCard, updateCard, deleteCard, deleteMany, recordResult, importCards, toggleFavorite } = useCards(
@@ -64,6 +64,10 @@ export default function App() {
   if (isFirebaseConfigured && !user && !skipped) {
     return <AuthScreen onLogin={login} onRegister={register} onSkip={() => setSkipped(true)} />
   }
+
+  // 選択中プロジェクトの出題方向（プロジェクト設定 > グローバル設定）
+  const selectedProject = projects.find((p) => p.id === selectedProjectId)
+  const direction = selectedProject?.direction ?? globalDirection
 
   // 現在のモード＋プロジェクトでフィルタされたカード
   const scopedCards = (() => {

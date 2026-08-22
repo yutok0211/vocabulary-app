@@ -16,7 +16,7 @@ export function TextImport({ onImport, onClose }: Props) {
   const [cardDelim, setCardDelim] = useState<CardDelim>('newline')
   const [customTerm, setCustomTerm] = useState('')
   const [customCard, setCustomCard] = useState('')
-  const [swapColumns, setSwapColumns] = useState(false)
+  const [swapColumns, setSwapColumns] = useState(true)
 
   const getTermChar = () => {
     if (termDelim === 'tab') return '\t'
@@ -186,9 +186,9 @@ export function TextImport({ onImport, onClose }: Props) {
               <div className="max-h-40 overflow-y-auto rounded-lg border bg-gray-50 p-3">
                 {preview.slice(0, 15).map((c, i) => (
                   <div key={i} className="border-b py-1 text-sm last:border-0">
-                    <span className="font-medium text-gray-800">{c.english}</span>
+                    <span className="font-medium text-gray-800">{c.japanese}</span>
                     <span className="mx-2 text-gray-400">→</span>
-                    <span className="text-gray-600">{c.japanese}</span>
+                    <span className="text-gray-600">{c.english}</span>
                     {Array.isArray(c.notes) && c.notes[0] && (
                       <span className="ml-2 text-xs text-amber-600">[備考: {c.notes[0]}]</span>
                     )}

@@ -43,9 +43,9 @@ export function useProjects(userId: string | null) {
   )
 
   const updateProject = useCallback(
-    (id: string, name: string) => {
+    (id: string, changes: Partial<Pick<import('../types').Project, 'name' | 'direction'>>) => {
       const updated = projects.map((p) =>
-        p.id === id ? { ...p, name, updatedAt: new Date().toISOString() } : p,
+        p.id === id ? { ...p, ...changes, updatedAt: new Date().toISOString() } : p,
       )
       const changed = updated.find((p) => p.id === id)!
       persist(updated, changed)

@@ -156,6 +156,15 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
   }, [index, selectedCount]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
+  // カードロード待ち（Firestore遅延 or キュー復元中）- due.length===0チェックより先に実施
+  if (cards.length === 0) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+      </div>
+    )
+  }
+
   if (!skipSelection && due.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
@@ -169,7 +178,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
     )
   }
 
-  // カードロード待ち（Firestore遅延 or キュー復元中）
+  // キュー復元待ち
   if (selectedCount !== null && !done && current === null) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">

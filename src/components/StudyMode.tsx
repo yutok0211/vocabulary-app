@@ -21,19 +21,52 @@ interface Props {
 }
 
 const COUNT_OPTIONS = [10, 20, 30, 50, 999]
+const LS_QUEUE = 'vocab_study_queue'
+const LS_INDEX = 'vocab_study_index'
+const LS_FLIPPED = 'vocab_study_flipped'
+const LS_COUNT = 'vocab_study_count'
+
+function saveStudyState(queue: WordCard[], index: number, flipped: boolean, count: number | null) {
+  localStorage.setItem(LS_QUEUE, JSON.stringify(queue.map((c) => c.id)))
+  localStorage.setItem(LS_INDEX, String(index))
+  localStorage.setItem(LS_FLIPPED, String(flipped))
+  if (count !== null) localStorage.setItem(LS_COUNT, String(count))
+  else localStorage.removeItem(LS_COUNT)
+}
+
+function clearStudyState() {
+  localStorage.removeItem(LS_QUEUE)
+  localStorage.removeItem(LS_INDEX)
+  localStorage.removeItem(LS_FLIPPED)
+  localStorage.removeItem(LS_COUNT)
+}
 
 export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSelection, onResult, onUpdate, onToggleFavorite, onBack }: Props) {
   const due = getDueCards(cards)
   const { speak } = useTTS(rate, voiceLang)
 
-  const [selectedCount, setSelectedCount] = useState<number | null>(() =>
-    skipSelection ? cards.length : null
-  )
-  const [queue, setQueue] = useState<WordCard[]>(() =>
-    skipSelection ? [...cards] : []
-  )
-  const [index, setIndex] = useState(0)
-  const [flipped, setFlipped] = useState(false)
+  // リロード復元: 保存済みのキューIDからカードを再構築
+  const [selectedCount, setSelectedCount] = useState<number | null>(() => {
+    if (skipSelection) return cards.length
+    const saved = localStorage.getItem(LS_COUNT)
+    return saved !== null ? Number(saved) : null
+  })
+  const [queue, setQueue] = useState<WordCard[]>(() => {
+    if (skipSelection) return [...cards]
+    const savedIds: string[] = JSON.parse(localStorage.getItem(LS_QUEUE) ?? '[]')
+    if (savedIds.length === 0) return []
+    const cardMap = new Map(cards.map((c) => [c.id, c]))
+    const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
+    return restored.length === savedIds.length ? restored : [] // 一部欠損なら初期化
+  })
+  const [index, setIndex] = useState(() => {
+    if (skipSelection) return 0
+    return Number(localStorage.getItem(LS_INDEX) ?? 0)
+  })
+  const [flipped, setFlipped] = useState(() => {
+    if (skipSelection) return false
+    return localStorage.getItem(LS_FLIPPED) === 'true'
+  })
   const [done, setDone] = useState(false)
   // 現ラウンドの不正解ID
   const [wrongInRound, setWrongInRound] = useState<Set<string>>(new Set())
@@ -45,10 +78,18 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
   const [totalCorrect, setTotalCorrect] = useState(0)
   const [totalWrong, setTotalWrong] = useState(0)
 
+  // 状態変化のたびに保存
+  useEffect(() => {
+    if (queue.length > 0 && selectedCount !== null) {
+      saveStudyState(queue, index, flipped, selectedCount)
+    }
+  }, [queue, index, flipped, selectedCount])
+
   const startStudy = useCallback(
     (count: number) => {
       const shuffled = shuffle([...due])
-      setQueue(count >= due.length ? shuffled : shuffled.slice(0, count))
+      const newQueue = count >= due.length ? shuffled : shuffled.slice(0, count)
+      setQueue(newQueue)
       setSelectedCount(count)
       setIndex(0)
       setFlipped(false)
@@ -57,6 +98,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
       setRound(1)
       setTotalCorrect(0)
       setTotalWrong(0)
+      saveStudyState(newQueue, 0, false, count)
     },
     [due],
   )
@@ -141,7 +183,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
           >
             <RotateCcw size={16} />もう一度
           </button>
-          <button onClick={onBack} className="rounded-xl bg-indigo-600 px-6 py-2.5 text-white hover:bg-indigo-700">
+          <button onClick={() => { clearStudyState(); onBack() }} className="rounded-xl bg-indigo-600 px-6 py-2.5 text-white hover:bg-indigo-700">
             一覧へ戻る
           </button>
         </div>
@@ -175,6 +217,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
         setWrongInRound(new Set())
         setRound((r) => r + 1)
       } else {
+        clearStudyState()
         setDone(true)
       }
     } else {
@@ -186,7 +229,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
     <div className="flex flex-col gap-4">
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
-        <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-800">
+        <button onClick={() => { clearStudyState(); onBack() }} className="flex items-center gap-1 text-gray-500 hover:text-gray-800">
           <ChevronLeft size={20} />戻る
         </button>
         <div className="flex items-center gap-2 text-sm text-gray-500">

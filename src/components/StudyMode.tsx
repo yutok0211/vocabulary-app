@@ -58,7 +58,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
     if (savedIds.length === 0) return []
     const cardMap = new Map(cards.map((c) => [c.id, c]))
     const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
-    return restored.length === savedIds.length ? restored : [] // 一部欠損なら初期化
+    return restored.length > 0 ? restored : []
   })
   const [index, setIndex] = useState(() => {
     if (skipSelection) return 0
@@ -100,9 +100,9 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
       if (savedIds.length === 0) return
       const cardMap = new Map(cards.map((c) => [c.id, c]))
       const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
-      if (restored.length === savedIds.length) {
+      if (restored.length > 0) {
         setQueue(restored)
-        setIndex(Number(localStorage.getItem(LS_INDEX) ?? 0))
+        setIndex(Math.min(Number(localStorage.getItem(LS_INDEX) ?? 0), restored.length - 1))
         setFlipped(localStorage.getItem(LS_FLIPPED) === 'true')
       } else {
         clearStudyState()

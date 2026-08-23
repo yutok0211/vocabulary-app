@@ -9,7 +9,6 @@ import { importFromCSV, exportToCSV } from '../lib/csv'
 import { useTTS } from '../hooks/useTTS'
 import type { VoiceLang } from '../hooks/useSettings'
 import { getDueCards } from '../lib/mastery'
-import { getNuanceGroups } from '../lib/nuance'
 
 interface Props {
   cards: WordCard[]
@@ -27,7 +26,6 @@ interface Props {
   onToggleFavorite: (id: string) => void
   onImport: (partials: Partial<WordCard>[]) => void
   onStudy: () => void
-  onStudyNuance: () => void
   onStudyCard: (card: WordCard) => void
   onBack: () => void
 }
@@ -48,7 +46,6 @@ export function WordList({
   onToggleFavorite,
   onImport,
   onStudy,
-  onStudyNuance,
   onStudyCard,
   onBack,
 }: Props) {
@@ -85,7 +82,6 @@ export function WordList({
   )
 
   const dueCount = getDueCards(scopedCards).length
-  const nuanceGroupCount = getNuanceGroups(scopedCards).length
   const existingGroupIds = Array.from(new Set(cards.map((c) => c.groupId).filter(Boolean)))
 
   const projectName =
@@ -253,22 +249,6 @@ export function WordList({
         </button>
       )}
 
-      {/* ニュアンス比較モード バナー */}
-      {mode === 'nuance' && (
-        nuanceGroupCount > 0 ? (
-          <button
-            onClick={onStudyNuance}
-            className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3.5 text-left text-white shadow hover:opacity-90"
-          >
-            <p className="font-semibold">ニュアンス比較モード 開始</p>
-            <p className="text-sm text-amber-100">{nuanceGroupCount} グループで出題可能</p>
-          </button>
-        ) : (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5 text-sm text-amber-800">
-            出題可能なグループがありません。カードを編集し、同じグループ名・強度ランクを2枚以上のカードに設定してください。
-          </div>
-        )
-      )}
 
       {/* 選択モード起動 / 選択バー */}
       {selectMode ? (

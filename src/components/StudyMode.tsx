@@ -372,6 +372,12 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
           existingGroupIds={Array.from(new Set(cards.map((c) => c.groupId).filter(Boolean)))}
           onSave={(changes) => {
             onUpdate(editingCard.id, changes)
+            const updatedCard = { ...editingCard, ...changes }
+            setQueue((q) => {
+              const newQ = q.map((c) => (c.id === editingCard.id ? updatedCard : c))
+              saveStudyState(newQ, index, flipped, selectedCount, wrongInRound, round)
+              return newQ
+            })
             setEditingCard(null)
           }}
           onClose={() => setEditingCard(null)}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Volume2, ChevronLeft, RotateCcw, Check, X as XIcon, Pencil, Heart } from 'lucide-react'
 import type { WordCard, StudyDirection, Project } from '../types'
 import { getDueCards } from '../lib/mastery'
@@ -45,82 +45,45 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
   const due = getDueCards(cards)
   const { speak } = useTTS(rate, voiceLang)
 
-  // リロード復元: 保存済みのキューIDからカードを再構築
-  // LS_COUNTとLS_QUEUEを一緒に検証してから復元（片方だけ残るとスピナー永久ループ）
-  const [selectedCount, setSelectedCount] = useState<number | null>(() => {
-    if (skipSelection) return cards.length
-    const count = localStorage.getItem(LS_COUNT)
-    if (count === null) return null
-    try {
-      const ids: string[] = JSON.parse(localStorage.getItem(LS_QUEUE) ?? '[]')
-      return ids.length > 0 ? Number(count) : null
-    } catch { return null }
-  })
-  const [queue, setQueue] = useState<WordCard[]>(() => {
-    if (skipSelection) return [...cards]
-    let savedIds: string[] = []
-    try { savedIds = JSON.parse(localStorage.getItem(LS_QUEUE) ?? '[]') } catch { clearStudyState() }
-    if (savedIds.length === 0) return []
-    const cardMap = new Map(cards.map((c) => [c.id, c]))
-    const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
-    return restored.length > 0 ? restored : []
-  })
-  const [index, setIndex] = useState(() => {
-    if (skipSelection) return 0
-    const saved = Number(localStorage.getItem(LS_INDEX) ?? 0)
-    try {
-      const ids: string[] = JSON.parse(localStorage.getItem(LS_QUEUE) ?? '[]')
-      return ids.length > 0 ? Math.min(saved, ids.length - 1) : 0
-    } catch { return 0 }
-  })
-  const [flipped, setFlipped] = useState(() => {
-    if (skipSelection) return false
-    return localStorage.getItem(LS_FLIPPED) === 'true'
-  })
+  const [selectedCount, setSelectedCount] = useState<number | null>(null)
+  const [queue, setQueue] = useState<WordCard[]>([])
+  const [index, setIndex] = useState(0)
+  const [flipped, setFlipped] = useState(false)
   const [done, setDone] = useState(false)
-  // 現ラウンドの不正解ID
   const [wrongInRound, setWrongInRound] = useState<Set<string>>(new Set())
   const [editingCard, setEditingCard] = useState<WordCard | null>(null)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
-  // 累計ラウンド数
   const [round, setRound] = useState(1)
-  // 累計正解・不正解カウント（セッション全体）
   const [totalCorrect, setTotalCorrect] = useState(0)
   const [totalWrong, setTotalWrong] = useState(0)
+  const restoredRef = useRef(false)
 
-  // カードがロードされたらキューを再構築（リロード直後にFirestoreが遅延する場合の対策）
+  // カードが揃ったら1回だけセッション復元（Firestoreの非同期ロード対応）
   useEffect(() => {
+    if (restoredRef.current) return
     if (cards.length === 0) return
+    restoredRef.current = true
+
     if (skipSelection) {
-      // 単一カードタップモード: cardsが届いたらキューをセット
-      if (queue.length === 0) {
-        setQueue([...cards])
-        setSelectedCount(cards.length)
-        setIndex(0)
-      }
+      setQueue([...cards])
+      setSelectedCount(cards.length)
       return
     }
-    // 通常モード: localStorage からキューを復元
-    if (queue.length > 0 || selectedCount === null) return
-    const saved = localStorage.getItem(LS_QUEUE)
-    if (!saved) { clearStudyState(); setSelectedCount(null); return }
     try {
-      const savedIds: string[] = JSON.parse(saved)
-      if (savedIds.length === 0) { clearStudyState(); setSelectedCount(null); return }
+      const count = localStorage.getItem(LS_COUNT)
+      const queueJson = localStorage.getItem(LS_QUEUE)
+      if (!count || !queueJson) return
+      const savedIds: string[] = JSON.parse(queueJson)
+      if (savedIds.length === 0) return
       const cardMap = new Map(cards.map((c) => [c.id, c]))
       const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
-      if (restored.length > 0) {
-        setQueue(restored)
-        setIndex(Math.min(Number(localStorage.getItem(LS_INDEX) ?? 0), restored.length - 1))
-        setFlipped(localStorage.getItem(LS_FLIPPED) === 'true')
-      } else {
-        clearStudyState()
-        setSelectedCount(null)
-      }
-    } catch {
-      clearStudyState()
-      setSelectedCount(null)
-    }
+      if (restored.length === 0) { clearStudyState(); return }
+      const savedIndex = Math.min(Number(localStorage.getItem(LS_INDEX) ?? 0), restored.length - 1)
+      setQueue(restored)
+      setSelectedCount(Number(count))
+      setIndex(savedIndex)
+      setFlipped(localStorage.getItem(LS_FLIPPED) === 'true')
+    } catch { clearStudyState() }
   }, [cards]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 状態変化のたびに保存
@@ -186,15 +149,6 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
         <button onClick={onBack} className="mt-4 rounded-xl bg-indigo-600 px-6 py-2.5 text-white hover:bg-indigo-700">
           一覧へ戻る
         </button>
-      </div>
-    )
-  }
-
-  // キュー復元待ち
-  if (selectedCount !== null && !done && current === null) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
       </div>
     )
   }

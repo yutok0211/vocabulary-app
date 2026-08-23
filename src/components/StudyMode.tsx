@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Volume2, ChevronLeft, RotateCcw, Check, X as XIcon, Pencil, Heart } from 'lucide-react'
 import type { WordCard, StudyDirection, Project } from '../types'
 import { getDueCards } from '../lib/mastery'
@@ -36,7 +36,8 @@ function saveStudyState(
   wrongIds: Set<string> = new Set(),
   round = 1,
 ) {
-  localStorage.setItem(LS_QUEUE, JSON.stringify(queue.map((c) => c.id)))
+  // カードデータごと保存（IDだけ保存するとcards propが揃う前に復元失敗するため）
+  localStorage.setItem(LS_QUEUE, JSON.stringify(queue))
   localStorage.setItem(LS_INDEX, String(index))
   localStorage.setItem(LS_FLIPPED, String(flipped))
   localStorage.setItem(LS_WRONG, JSON.stringify([...wrongIds]))
@@ -66,14 +67,8 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
   const [round, setRound] = useState(1)
   const [totalCorrect, setTotalCorrect] = useState(0)
   const [totalWrong, setTotalWrong] = useState(0)
-  const restoredRef = useRef(false)
-
-  // カードが揃ったら1回だけセッション復元（Firestoreの非同期ロード対応）
+  // マウント時に1回だけセッション復元
   useEffect(() => {
-    if (restoredRef.current) return
-    if (cards.length === 0) return
-    restoredRef.current = true
-
     if (skipSelection) {
       setQueue([...cards])
       setSelectedCount(cards.length)
@@ -83,11 +78,8 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
       const count = localStorage.getItem(LS_COUNT)
       const queueJson = localStorage.getItem(LS_QUEUE)
       if (!count || !queueJson) return
-      const savedIds: string[] = JSON.parse(queueJson)
-      if (savedIds.length === 0) return
-      const cardMap = new Map(cards.map((c) => [c.id, c]))
-      const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
-      if (restored.length === 0) { clearStudyState(); return }
+      const restored: WordCard[] = JSON.parse(queueJson)
+      if (!Array.isArray(restored) || restored.length === 0) { clearStudyState(); return }
       const savedIndex = Math.min(Number(localStorage.getItem(LS_INDEX) ?? 0), restored.length - 1)
       const savedWrong: string[] = JSON.parse(localStorage.getItem(LS_WRONG) ?? '[]')
       const savedRound = Number(localStorage.getItem(LS_ROUND) ?? 1)
@@ -98,7 +90,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
       setWrongInRound(new Set(savedWrong))
       setRound(savedRound)
     } catch { clearStudyState() }
-  }, [cards]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const startStudy = useCallback(
     (count: number) => {

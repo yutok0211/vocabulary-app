@@ -25,20 +25,30 @@ const LS_QUEUE = 'vocab_study_queue'
 const LS_INDEX = 'vocab_study_index'
 const LS_FLIPPED = 'vocab_study_flipped'
 const LS_COUNT = 'vocab_study_count'
+const LS_WRONG = 'vocab_study_wrong'
+const LS_ROUND = 'vocab_study_round'
 
-function saveStudyState(queue: WordCard[], index: number, flipped: boolean, count: number | null) {
+function saveStudyState(
+  queue: WordCard[],
+  index: number,
+  flipped: boolean,
+  count: number | null,
+  wrongIds: Set<string> = new Set(),
+  round = 1,
+) {
   localStorage.setItem(LS_QUEUE, JSON.stringify(queue.map((c) => c.id)))
   localStorage.setItem(LS_INDEX, String(index))
   localStorage.setItem(LS_FLIPPED, String(flipped))
+  localStorage.setItem(LS_WRONG, JSON.stringify([...wrongIds]))
+  localStorage.setItem(LS_ROUND, String(round))
   if (count !== null) localStorage.setItem(LS_COUNT, String(count))
   else localStorage.removeItem(LS_COUNT)
 }
 
 function clearStudyState() {
-  localStorage.removeItem(LS_QUEUE)
-  localStorage.removeItem(LS_INDEX)
-  localStorage.removeItem(LS_FLIPPED)
-  localStorage.removeItem(LS_COUNT)
+  ;[LS_QUEUE, LS_INDEX, LS_FLIPPED, LS_COUNT, LS_WRONG, LS_ROUND].forEach((k) =>
+    localStorage.removeItem(k),
+  )
 }
 
 export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSelection, onResult, onUpdate, onToggleFavorite, onBack }: Props) {
@@ -79,19 +89,16 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
       const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
       if (restored.length === 0) { clearStudyState(); return }
       const savedIndex = Math.min(Number(localStorage.getItem(LS_INDEX) ?? 0), restored.length - 1)
+      const savedWrong: string[] = JSON.parse(localStorage.getItem(LS_WRONG) ?? '[]')
+      const savedRound = Number(localStorage.getItem(LS_ROUND) ?? 1)
       setQueue(restored)
       setSelectedCount(Number(count))
       setIndex(savedIndex)
       setFlipped(localStorage.getItem(LS_FLIPPED) === 'true')
+      setWrongInRound(new Set(savedWrong))
+      setRound(savedRound)
     } catch { clearStudyState() }
   }, [cards]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 状態変化のたびに保存
-  useEffect(() => {
-    if (queue.length > 0 && selectedCount !== null) {
-      saveStudyState(queue, index, flipped, selectedCount)
-    }
-  }, [queue, index, flipped, selectedCount])
 
   const startStudy = useCallback(
     (count: number) => {
@@ -107,7 +114,7 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
       setRound(1)
       setTotalCorrect(0)
       setTotalWrong(0)
-      saveStudyState(newQueue, 0, false, count)
+      saveStudyState(newQueue, 0, false, count, new Set(), 1)
     },
     [due],
   )
@@ -231,17 +238,23 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
       if (newWrong.size > 0) {
         // 不正解カードを再キューしてもう1ラウンド
         const wrongCards = queue.filter((c) => newWrong.has(c.id))
-        setQueue(shuffle(wrongCards))
+        const nextQueue = shuffle(wrongCards)
+        const nextRound = round + 1
+        setQueue(nextQueue)
         setIndex(0)
         setFlipped(false)
         setWrongInRound(new Set())
-        setRound((r) => r + 1)
+        setRound(nextRound)
+        saveStudyState(nextQueue, 0, false, selectedCount, new Set(), nextRound)
       } else {
         clearStudyState()
         setDone(true)
       }
     } else {
-      setIndex((i) => i + 1)
+      const nextIndex = index + 1
+      setIndex(nextIndex)
+      // useEffectに頼らず即座に保存（リロード対策）
+      saveStudyState(queue, nextIndex, false, selectedCount, newWrong, round)
     }
   }
 

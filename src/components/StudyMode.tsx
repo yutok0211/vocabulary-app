@@ -46,10 +46,15 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
   const { speak } = useTTS(rate, voiceLang)
 
   // リロード復元: 保存済みのキューIDからカードを再構築
+  // LS_COUNTとLS_QUEUEを一緒に検証してから復元（片方だけ残るとスピナー永久ループ）
   const [selectedCount, setSelectedCount] = useState<number | null>(() => {
     if (skipSelection) return cards.length
-    const saved = localStorage.getItem(LS_COUNT)
-    return saved !== null ? Number(saved) : null
+    const count = localStorage.getItem(LS_COUNT)
+    if (count === null) return null
+    try {
+      const ids: string[] = JSON.parse(localStorage.getItem(LS_QUEUE) ?? '[]')
+      return ids.length > 0 ? Number(count) : null
+    } catch { return null }
   })
   const [queue, setQueue] = useState<WordCard[]>(() => {
     if (skipSelection) return [...cards]
@@ -94,10 +99,10 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
     // 通常モード: localStorage からキューを復元
     if (queue.length > 0 || selectedCount === null) return
     const saved = localStorage.getItem(LS_QUEUE)
-    if (!saved) return
+    if (!saved) { clearStudyState(); setSelectedCount(null); return }
     try {
       const savedIds: string[] = JSON.parse(saved)
-      if (savedIds.length === 0) return
+      if (savedIds.length === 0) { clearStudyState(); setSelectedCount(null); return }
       const cardMap = new Map(cards.map((c) => [c.id, c]))
       const restored = savedIds.map((id) => cardMap.get(id)).filter(Boolean) as WordCard[]
       if (restored.length > 0) {

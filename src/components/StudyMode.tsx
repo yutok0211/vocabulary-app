@@ -67,7 +67,11 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
   })
   const [index, setIndex] = useState(() => {
     if (skipSelection) return 0
-    return Number(localStorage.getItem(LS_INDEX) ?? 0)
+    const saved = Number(localStorage.getItem(LS_INDEX) ?? 0)
+    try {
+      const ids: string[] = JSON.parse(localStorage.getItem(LS_QUEUE) ?? '[]')
+      return ids.length > 0 ? Math.min(saved, ids.length - 1) : 0
+    } catch { return 0 }
   })
   const [flipped, setFlipped] = useState(() => {
     if (skipSelection) return false

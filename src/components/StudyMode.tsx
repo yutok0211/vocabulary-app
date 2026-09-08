@@ -36,8 +36,9 @@ function saveStudyState(
   wrongIds: Set<string> = new Set(),
   round = 1,
 ) {
-  // カードデータごと保存（IDだけ保存するとcards propが揃う前に復元失敗するため）
-  localStorage.setItem(LS_QUEUE, JSON.stringify(queue))
+  // images（base64）を除いて保存してlocalStorageクォータ超過を防ぐ
+  const compact = queue.map(({ images: _i, ...rest }) => ({ ...rest, images: [] as string[] }))
+  localStorage.setItem(LS_QUEUE, JSON.stringify(compact))
   localStorage.setItem(LS_INDEX, String(index))
   localStorage.setItem(LS_FLIPPED, String(flipped))
   localStorage.setItem(LS_WRONG, JSON.stringify([...wrongIds]))
@@ -78,8 +79,14 @@ export function StudyMode({ cards, projects, direction, rate, voiceLang, skipSel
       const count = localStorage.getItem(LS_COUNT)
       const queueJson = localStorage.getItem(LS_QUEUE)
       if (!count || !queueJson) return
-      const restored: WordCard[] = JSON.parse(queueJson)
-      if (!Array.isArray(restored) || restored.length === 0) { clearStudyState(); return }
+      const compact: WordCard[] = JSON.parse(queueJson)
+      if (!Array.isArray(compact) || compact.length === 0) { clearStudyState(); return }
+      // imagesをcards propから補完（保存時に省略しているため）
+      const cardMap = new Map(cards.map((c) => [c.id, c]))
+      const restored = compact.map((c) => {
+        const live = cardMap.get(c.id)
+        return live ? { ...c, images: live.images } : c
+      })
       const savedIndex = Math.min(Number(localStorage.getItem(LS_INDEX) ?? 0), restored.length - 1)
       const savedWrong: string[] = JSON.parse(localStorage.getItem(LS_WRONG) ?? '[]')
       const savedRound = Number(localStorage.getItem(LS_ROUND) ?? 1)

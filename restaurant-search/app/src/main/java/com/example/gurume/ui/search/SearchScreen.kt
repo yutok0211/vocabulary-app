@@ -107,7 +107,7 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("グルメ検索", fontWeight = FontWeight.Bold) },
+                title = { Text("マップめし", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,

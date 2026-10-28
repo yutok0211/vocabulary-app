@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GurumeSearch"
+rootProject.name = "MapMeshi"
 include(":app")

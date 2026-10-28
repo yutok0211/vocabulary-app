@@ -1,4 +1,4 @@
-# グルメ検索（Android）
+# マップめし（Android）
 
 食べログ風の検索UIで、評価軸に **Google マップの評価・口コミ** を使う飲食店検索アプリ。
 Kotlin + Jetpack Compose、データは Google Places API (New) から取得する。

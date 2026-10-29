@@ -1,6 +1,14 @@
-# マップめし スクレイパー
+# マップめし 飲食店データ収集
 
-食べログ・ぐるなび・ホットペッパー・Retty から飲食店情報を集め、同じ店を1件にまとめて CSV / JSON に出力する。
+飲食店情報を複数のソースから集め、同じ店を1件にまとめて CSV / JSON に出力する。
+
+| ソース | 取得方法 | 件数の目安 | 取れる項目 | 必要なもの |
+|---|---|---|---|---|
+| **OpenStreetMap** | Overpass API | 都市部は多い、地方は少なめ | 店名・位置・ジャンル・営業時間・電話（登録があれば） | なし |
+| **ホットペッパー** | グルメサーチ API | 全国の掲載店 | 店名・住所・位置・ジャンル・平均予算・営業時間 | 無料の API キー |
+| 食べログ等の Web ページ | スクレイピング（`crawl`） | 指定した一覧ページ分 | 評価点・件数など | — |
+
+大量に集めるなら、まず API の2つ（`osm` / `hotpepper`）を使う。
 
 ## 準備
 
@@ -11,7 +19,36 @@ cd restaurant-scraper
 pip install -r requirements.txt      # Windows は py -m pip install -r requirements.txt
 ```
 
-## 使い方
+## 都道府県単位で一括取得（おすすめ）
+
+```bash
+# OpenStreetMap（キー不要）
+python -m mapmeshi_scraper osm 東京都 神奈川県
+
+# ホットペッパー（キーは https://webservice.recruit.co.jp/ でメール登録すると無料で発行）
+python -m mapmeshi_scraper hotpepper 東京都 --key <APIキー>
+python -m mapmeshi_scraper hotpepper 東京都 --key <APIキー> --max 200   # お試しで200件だけ
+
+# 47都道府県すべて
+python -m mapmeshi_scraper osm 全国
+python -m mapmeshi_scraper hotpepper 全国 --key <APIキー>
+
+# 同じ店をまとめて CSV / JSON に出力
+python -m mapmeshi_scraper merge
+```
+
+- OpenStreetMap は1都道府県あたり1回の問い合わせ。混雑時は 429/504 が返るので数分おいて再実行する。都道府県の間は30秒あける
+- ホットペッパーは100件ずつ1秒間隔で取得する。キーは環境変数 `HOTPEPPER_API_KEY` でも指定できる
+- 何度実行しても、取得済みの店（同じ URL）は追加されない
+
+### 表示が必要なクレジット
+
+集めたデータを画面や資料に出すときは次を表示する。
+
+- OpenStreetMap: `© OpenStreetMap contributors`（データは ODbL ライセンス）
+- ホットペッパー: `Powered by ホットペッパー Webサービス`
+
+## Web ページからの収集（crawl）
 
 1. 各サイトをブラウザで普通に検索し、**検索結果一覧ページの URL** をコピーする（店舗ページの URL でもよい）
 2. 収集する
@@ -21,33 +58,26 @@ python -m mapmeshi_scraper crawl "https://tabelog.com/tokyo/A1303/A130301/rstLst
                                  "https://r.gnavi.co.jp/area/..." --max-pages 3
 ```
 
-3. 同じ店をまとめて出力する
+## 出力（`data/`）
 
-```bash
-python -m mapmeshi_scraper merge
-```
-
-出力（`data/`）:
 
 | ファイル | 内容 |
 |---|---|
 | `shops.jsonl` | サイトごとの生データ（1行1店）。crawl を再実行すると取得済みの店は飛ばす |
-| `restaurants.csv` | まとめた結果。Excel でそのまま開ける（UTF-8 BOM 付き）。列はサイトごとの評価・件数・URL |
+| `restaurants.csv` | まとめた結果。Excel でそのまま開ける（UTF-8 BOM 付き）。列はソースごとの評価・件数・URL |
 | `restaurants.json` | 同じ内容の JSON |
 
-## 取得する項目
-
-店名・住所・緯度経度・電話番号・ジャンル・予算・評価点・評価件数・営業時間。
+## crawl の仕組み
 
 各サイトが検索エンジン向けにページに埋め込んでいる構造化データ（JSON-LD / schema.org の Restaurant）から読む。
 JSON-LD に評価が無いサイトは `sites.py` の CSS セレクタで補う。サイトの HTML が変わって取れなくなったら `sites.py` を直す。
 
-## 同一店舗の判定
+## 同一店舗の判定（merge）
 
 1. 電話番号が両方にある → 一致すれば同じ店（違えば別の店）
 2. 電話番号が片方にしか無い → 店名（空白・括弧内を除いて正規化）が片方に含まれ、かつ位置が 100m 以内
 
-## アクセスの配慮
+## crawl のアクセスの配慮
 
 - robots.txt を読み、禁止されたページは取得しない。robots.txt を取得できない場合は取得しない
 - 同じサイトへのアクセスは 5 秒以上の間隔をあける（`--delay`、最小 3 秒）。robots.txt の Crawl-delay が長ければそちらに従う

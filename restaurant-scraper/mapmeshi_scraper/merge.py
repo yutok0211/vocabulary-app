@@ -1,13 +1,15 @@
-"""複数サイトの同一店舗をまとめる。"""
+"""複数ソースの同一店舗をまとめる。数万件でも動くよう、電話番号と位置のインデックスで候補を絞る。"""
 from __future__ import annotations
 
 import math
 import re
 import unicodedata
+from collections import defaultdict
 
 from .parse import Shop
 
 MAX_DISTANCE_M = 100
+CELL_DEG = 0.001  # 約 100m 四方のグリッド
 
 
 def normalize_phone(p: str | None) -> str | None:
@@ -21,7 +23,7 @@ def normalize_phone(p: str | None) -> str | None:
 
 def normalize_name(n: str) -> str:
     n = unicodedata.normalize("NFKC", n).lower()
-    n = re.sub(r"[（(【\[].*?[）)】\]]", "", n)  # 括弧内（支店名の読み・旧店名など）
+    n = re.sub(r"[（(【\[].*?[）)】\]]", "", n)  # 括弧内（読み・旧店名など）
     n = re.sub(r"\s+|[・･'’\-ー〜~!！?？&＆.。,、]", "", n)
     return n
 
@@ -47,15 +49,43 @@ def same_shop(a: Shop, b: Shop) -> bool:
     return d is not None and d <= MAX_DISTANCE_M
 
 
+def _cell(s: Shop) -> tuple[int, int] | None:
+    if s.lat is None or s.lng is None:
+        return None
+    return int(math.floor(s.lat / CELL_DEG)), int(math.floor(s.lng / CELL_DEG))
+
+
 def merge(shops: list[Shop]) -> list[dict]:
     groups: list[list[Shop]] = []
+    by_phone: dict[str, list[int]] = defaultdict(list)
+    by_cell: dict[tuple[int, int], list[int]] = defaultdict(list)
+
     for s in shops:
-        for g in groups:
+        candidates: list[int] = []
+        phone = normalize_phone(s.phone)
+        if phone:
+            candidates += by_phone.get(phone, [])
+        cell = _cell(s)
+        if cell:
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    candidates += by_cell.get((cell[0] + dy, cell[1] + dx), [])
+
+        target = None
+        for gi in dict.fromkeys(candidates):
+            g = groups[gi]
             if s.site not in {x.site for x in g} and any(same_shop(s, x) for x in g):
-                g.append(s)
+                target = gi
                 break
-        else:
+        if target is None:
             groups.append([s])
+            target = len(groups) - 1
+        else:
+            groups[target].append(s)
+        if phone:
+            by_phone[phone].append(target)
+        if cell:
+            by_cell[cell].append(target)
 
     merged = []
     for g in groups:
@@ -69,6 +99,7 @@ def merge(shops: list[Shop]) -> list[dict]:
             "phone": first("phone"),
             "genre": sorted({c for x in g for c in x.genre}),
             "price": first("price"),
+            "opening_hours": first("opening_hours") or [],
             "sources": {
                 x.site: {"url": x.url, "rating": x.rating, "rating_count": x.rating_count, "name": x.name}
                 for x in g

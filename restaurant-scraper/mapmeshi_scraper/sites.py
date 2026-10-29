@@ -19,6 +19,13 @@ class Site:
 
 
 SITES = (
+    # API で取得するソース（スクレイピングではない）
+    Site(
+        key="osm",
+        label="OpenStreetMap",
+        hosts=("www.openstreetmap.org",),
+        shop_url=re.compile(r"^https://www\.openstreetmap\.org/(node|way|relation)/\d+$"),
+    ),
     Site(
         key="tabelog",
         label="食べログ",

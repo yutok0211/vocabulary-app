@@ -67,7 +67,7 @@ class DatasetTest {
         assertEquals(listOf("炭火焼鳥 てっぺん", "大衆酒場 よいどれ"), Dataset.search(shops, "", "居酒屋", null).map { it.name })
         // 渋谷駅から 1.5km 以内、近い順
         val near = Dataset.search(shops, "", "", GeoPoint(35.6580, 139.7016)).map { it.name }
-        assertEquals(listOf("鮨 しおん", "炭火焼鳥 てっぺん"), near)
+        assertEquals(listOf("炭火焼鳥 てっぺん", "鮨 しおん"), near)  // 約180m と 約240m
     }
 
     @Test

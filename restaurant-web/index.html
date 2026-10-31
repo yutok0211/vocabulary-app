@@ -555,7 +555,7 @@ button { cursor: pointer; }
     const m = String(t || "").replace(/[,，]/g, "").match(/\d+/);
     if (!m) return null;
     const v = Number(m[0]);
-    return v <= 1500 ? "INEXPENSIVE" : v <= 4000 ? "MODERATE" : v <= 10000 ? "EXPENSIVE" : "VERY_EXPENSIVE";
+    return v <= 1500 ? "INEXPENSIVE" : v <= 4000 ? "MODERATE" : v < 10000 ? "EXPENSIVE" : "VERY_EXPENSIVE";
   }
   const shortArea = (a) => (a || "").replace(/^(東京都|北海道|京都府|大阪府|.{2,3}県)/, "").slice(0, 16) || null;
 

@@ -104,7 +104,7 @@ object Dataset {
         return when {
             value <= 1_500 -> PriceLevel.INEXPENSIVE
             value <= 4_000 -> PriceLevel.MODERATE
-            value <= 10_000 -> PriceLevel.EXPENSIVE
+            value < 10_000 -> PriceLevel.EXPENSIVE
             else -> PriceLevel.VERY_EXPENSIVE
         }
     }

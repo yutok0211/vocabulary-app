@@ -76,6 +76,8 @@ button { cursor: pointer; }
   background: transparent; border: 1px solid currentColor; border-radius: 999px;
   padding: 4px 12px; font-size: 13px; color: inherit;
 }
+.icon-btn { white-space: nowrap; }
+@media (max-width: 480px) { .brand small { display: none; } .appbar .wrap { gap: 8px; } }
 
 .demo-banner { background: var(--demo-bg); color: var(--demo-fg); font-size: 13px; }
 .demo-banner .wrap { padding-block: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -161,6 +163,11 @@ button { cursor: pointer; }
 .tags { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; }
 .tag-open { color: var(--open); font-weight: 700; }
 .tag-closed { color: var(--muted); }
+.tag-fac { border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; line-height: 1.6; }
+.tag-fac.good { border-color: var(--open); color: var(--open); }
+.sources { font-size: 11px; color: var(--muted); }
+.switch:has(input:disabled) { opacity: .5; }
+.keyform input[type="file"] { font-size: 13px; max-width: 100%; }
 .empty, .error, .loading { text-align: center; color: var(--muted); padding: 40px 0; }
 .error { color: var(--accent); }
 
@@ -232,13 +239,14 @@ button { cursor: pointer; }
   <div class="wrap">
     <h1 class="brand">マップめし<small>Google マップの評価で探す</small></h1>
     <span class="spacer"></span>
+    <button class="icon-btn" id="openData" type="button">データ</button>
     <button class="icon-btn" id="openKey" type="button">APIキー</button>
   </div>
 </header>
 
 <div class="demo-banner" id="demoBanner" hidden>
   <div class="wrap">
-    <span>サンプルデータ（架空の店舗）で表示中です。</span>
+    <span id="bannerText">サンプルデータ（架空の店舗）で表示中です。</span>
     <button type="button" id="demoKeyLink">APIキーを設定すると実際のお店を検索できます</button>
   </div>
 </div>
@@ -246,7 +254,7 @@ button { cursor: pointer; }
 <section class="search">
   <form class="wrap" id="searchForm" autocomplete="off">
     <label class="field"><span>エリア・駅</span><input id="area" type="search" placeholder="例：渋谷駅、新宿三丁目" enterkeyhint="next"></label>
-    <label class="field"><span>キーワード</span><input id="keyword" type="search" placeholder="例：焼肉、個室、店名" enterkeyhint="search"></label>
+    <label class="field"><span>キーワード</span><input id="keyword" type="search" placeholder="例：焼肉、もつ鍋、店名" enterkeyhint="search"></label>
     <div class="search-row">
       <button type="button" class="toggle" id="nearMe" aria-pressed="false">📍 現在地から探す</button>
       <button type="submit" class="btn-primary" id="searchBtn">検索</button>
@@ -263,7 +271,7 @@ button { cursor: pointer; }
     <div class="tabs" role="tablist" id="tabs"></div>
     <div class="meta">
       <span class="count" id="count"></span>
-      <span class="attr">評価・口コミ: Google マップ</span>
+      <span class="attr" id="attr">評価・口コミ: Google マップ</span>
       <button type="button" class="filter-btn" id="openFilter">絞り込み <span class="badge" id="filterBadge" hidden></span></button>
     </div>
   </div>
@@ -280,9 +288,16 @@ button { cursor: pointer; }
 <section class="sheet" id="filterSheet" hidden aria-label="絞り込み">
   <div class="wrap">
     <h2>絞り込み</h2>
-    <div><h3>Google マップの評価</h3><div class="opts" id="optRating"></div></div>
-    <div><h3>口コミ件数</h3><div class="opts" id="optReviews"></div></div>
+    <div id="ratingSection"><h3>Google マップの評価</h3><div class="opts" id="optRating"></div></div>
+    <div id="reviewSection"><h3>口コミ件数</h3><div class="opts" id="optReviews"></div></div>
     <div><h3>予算</h3><div class="opts" id="optPrice"></div></div>
+    <div>
+      <h3>席・設備</h3>
+      <label class="switch"><span>禁煙のみ</span><input type="checkbox" id="optNoSmoking"></label>
+      <label class="switch"><span>個室あり</span><input type="checkbox" id="optPrivate"></label>
+      <label class="switch"><span>カウンター席あり</span><input type="checkbox" id="optCounter"></label>
+      <p class="note" id="facilityNote" hidden>Google マップのデータには禁煙・個室・カウンター席の情報がありません。この3つは「データ」から読み込んだ店舗で使えます。</p>
+    </div>
     <label class="switch"><span>営業中のみ</span><input type="checkbox" id="optOpen"></label>
     <label class="switch"><span>予約可のみ</span><input type="checkbox" id="optReserve"></label>
     <div class="sheet-actions">
@@ -303,6 +318,21 @@ button { cursor: pointer; }
     <div class="sheet-actions">
       <button type="button" class="btn-text" id="clearKey">削除してサンプルに戻す</button>
       <button type="button" class="btn-primary" id="saveKey">保存</button>
+    </div>
+  </div>
+</section>
+
+<!-- 集めたデータ -->
+<div class="sheet-backdrop" id="dataBackdrop" hidden></div>
+<section class="sheet" id="dataSheet" hidden aria-label="データの読み込み">
+  <div class="wrap keyform">
+    <h2>集めたデータを読み込む</h2>
+    <p>restaurant-scraper の merge で作った restaurants.json を選ぶと、その店舗の中から検索できます。禁煙・個室・カウンター席で絞り込めるのはこのデータです。</p>
+    <input type="file" id="dataFile" accept=".json,application/json">
+    <p id="dataStatus">ファイルはこのブラウザの中だけで読み込み、どこにも送信しません。</p>
+    <div class="sheet-actions">
+      <button type="button" class="btn-text" id="clearData">読み込みを解除</button>
+      <button type="button" class="btn-primary" id="closeData">閉じる</button>
     </div>
   </div>
 </section>
@@ -330,17 +360,23 @@ button { cursor: pointer; }
   const REVIEW_OPTS = [0, 10, 50, 100, 500];
   const FOOD_TYPES = new Set(["restaurant", "food", "cafe", "bar", "bakery", "meal_takeaway", "meal_delivery", "coffee_shop", "pub", "wine_bar", "food_court"]);
   const KEY_STORAGE = "mapmeshi.apiKey";
+  const DEFAULT_FILTERS = { minRating: 0, minReviews: 0, prices: [], openOnly: false, reserveOnly: false, noSmoking: false, privateRoom: false, counter: false };
+  const MAX_DATASET_RESULTS = 300;
+  const SOURCE_LABEL = { tabelog: "食べログ", gnavi: "ぐるなび", hotpepper: "ホットペッパー", retty: "Retty", osm: "OpenStreetMap" };
+  const SOURCE_CREDIT = { osm: "© OpenStreetMap contributors", hotpepper: "Powered by ホットペッパー Webサービス" };
 
   // ---- 状態 ----
   const state = {
     area: "", keyword: "", nearMe: false,
     sort: "ranking",
-    filters: { minRating: 0, minReviews: 0, prices: [], openOnly: false, reserveOnly: false },
+    filters: structuredClone(DEFAULT_FILTERS),
     results: [], origin: null, loading: false, error: null, searched: false,
   };
   let apiKey = "";
   try { apiKey = localStorage.getItem(KEY_STORAGE) || ""; } catch (_) {}
   const detailCache = new Map();
+  let dataset = null;        // 読み込んだ restaurants.json（店舗の配列）
+  let datasetSources = [];   // データに含まれる情報元
 
   // ---- ユーティリティ ----
   const $ = (id) => document.getElementById(id);
@@ -356,6 +392,8 @@ button { cursor: pointer; }
   const fmtDist = (m) => m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`;
   const starsHtml = (rating) => `<span class="stars" aria-label="5点中${rating.toFixed(1)}"><i style="width:${Math.max(0, Math.min(100, rating / 5 * 100))}%"></i></span>`;
   const cleanAddress = (a) => (a || "").replace(/^日本、\s*/, "").replace(/^〒\d{3}-\d{4}\s*/, "");
+  const norm = (s) => String(s ?? "").normalize("NFKC").toLowerCase();
+  const yn = (v) => v == null ? null : v ? "あり" : "なし";
 
   // ---- データ取得: サンプル ----
   // すべて架空の店舗。UI 確認用。
@@ -380,6 +418,14 @@ button { cursor: pointer; }
   ].map(([id, name, genre, area, rating, reviewCount, priceLevel, lat, lng, openNow, reservable, glyph]) => ({
     id, name, genre, area, rating, reviewCount, priceLevel, location: { lat, lng }, openNow, reservable, glyph, photos: [], sample: true,
   }));
+  // 禁煙・喫煙 / 個室 / カウンター席（架空）
+  const SAMPLE_FACILITIES = {
+    s01: ["禁煙", false, true], s02: ["禁煙", true, true], s03: ["分煙", true, false], s04: ["喫煙可", false, true],
+    s05: ["禁煙", false, true], s06: ["分煙", false, true], s07: ["禁煙", true, true], s08: ["禁煙", false, true],
+    s09: ["禁煙", true, false], s10: ["禁煙", false, true], s11: ["分煙", true, false], s12: ["禁煙", true, false],
+    s13: ["禁煙", false, true], s14: ["禁煙", false, true], s15: ["喫煙可", false, true], s16: ["喫煙可", true, true],
+  };
+  for (const s of SAMPLE) [s.smoking, s.privateRoom, s.counter] = SAMPLE_FACILITIES[s.id];
   const SAMPLE_REVIEWS = [
     ["Kさん", 5, "1か月前", "スープが澄んでいて最後まで飲み干せました。開店直後は並びますが回転は早いです。"],
     ["mika", 4, "3か月前", "接客が丁寧で居心地が良いです。混む時間帯は予約がおすすめ。"],
@@ -466,9 +512,26 @@ button { cursor: pointer; }
       const { Place } = await loadMaps(apiKey);
       const p = new Place({ id, requestedLanguage: "ja" });
       await p.fetchFields({ fields: DETAIL_FIELDS });
+      return placeToDetail(p);
+    },
+    /** 集めたデータの店舗を Google マップの店舗と突き合わせる。見つからなければ null。 */
+    async match(rec) {
+      const { Place } = await loadMaps(apiKey);
+      const req = { textQuery: `${rec.name} ${rec.address || ""}`.trim(), fields: DETAIL_FIELDS, language: "ja", region: "jp", maxResultCount: 1 };
+      if (rec.location) req.locationBias = { center: rec.location, radius: 200 };
+      const { places } = await Place.searchByText(req);
+      const p = places?.[0];
+      if (!p) return null;
+      if (rec.location && p.location && distance(rec.location, { lat: p.location.lat(), lng: p.location.lng() }) > 300) return null;
+      return placeToDetail(p);
+    },
+  };
+
+  async function placeToDetail(p) {
       const base = await toRestaurant(p);
       return {
         ...base,
+        placeId: p.id,
         address: cleanAddress(p.formattedAddress),
         description: p.editorialSummary || null,
         hours: p.regularOpeningHours?.weekdayDescriptions || [],
@@ -485,13 +548,75 @@ button { cursor: pointer; }
           text: r.text,
         })),
       };
+  }
+
+  // ---- データ取得: 集めたデータ（restaurant-scraper の restaurants.json） ----
+  function priceLevelFromText(t) {
+    const m = String(t || "").replace(/[,，]/g, "").match(/\d+/);
+    if (!m) return null;
+    const v = Number(m[0]);
+    return v <= 1500 ? "INEXPENSIVE" : v <= 4000 ? "MODERATE" : v <= 10000 ? "EXPENSIVE" : "VERY_EXPENSIVE";
+  }
+  const shortArea = (a) => (a || "").replace(/^(東京都|北海道|京都府|大阪府|.{2,3}県)/, "").slice(0, 16) || null;
+
+  function fromRecord(m, i) {
+    const genres = Array.isArray(m.genre) ? m.genre : [];
+    return {
+      id: "d" + i, dataset: true,
+      name: String(m.name),
+      genre: genres.slice(0, 2).join("・") || null,
+      area: shortArea(m.address), address: m.address || null,
+      location: m.lat != null && m.lng != null ? { lat: Number(m.lat), lng: Number(m.lng) } : null,
+      rating: null, reviewCount: 0,
+      priceLevel: priceLevelFromText(m.price), priceText: m.price || null,
+      openNow: null, reservable: null, photos: [],
+      glyph: (genres[0] || m.name || "食").slice(0, 1),
+      smoking: m.smoking ?? null, privateRoom: m.private_room ?? null, counter: m.counter ?? null,
+      phone: m.phone || null, hours: Array.isArray(m.opening_hours) ? m.opening_hours : [],
+      sources: m.sources && typeof m.sources === "object" ? m.sources : {},
+    };
+  }
+
+  const DatasetProvider = {
+    async search({ area, keyword, origin }) {
+      const k = norm(keyword).trim();
+      const alias = norm(GENRE_ALIASES[keyword.trim()] || k);
+      const a = norm(area).trim().replace(/駅$/, "");
+      let list = dataset;
+      if (origin) {
+        list = list.filter((r) => r.location && distance(origin, r.location) <= NEARBY_RADIUS)
+          .sort((x, y) => distance(origin, x.location) - distance(origin, y.location));
+      } else if (a) {
+        list = list.filter((r) => norm(r.address).includes(a) || norm(r.name).includes(a));
+      }
+      if (k) list = list.filter((r) => norm(r.name).includes(k) || norm(r.genre).includes(k) || norm(r.genre).includes(alias));
+      return list.slice(0, MAX_DATASET_RESULTS);
+    },
+    async detail(id) {
+      const rec = dataset?.find((r) => r.id === id);
+      if (!rec) throw new Error("このお店のデータが読み込まれていません。「データ」から restaurants.json を読み込み直してください。");
+      const d = { ...rec, description: null, website: null, mapsUri: null, lunch: null, dinner: null, takeout: null, reviews: [], google: "nokey" };
+      if (!apiKey) return d;
+      try {
+        const g = await LiveProvider.match(rec);
+        if (!g) return { ...d, google: "notfound" };
+        // 店名・住所・設備は集めたデータを優先し、評価・口コミ・写真を Google から重ねる
+        return {
+          ...d, google: "ok", placeId: g.placeId, rating: g.rating, reviewCount: g.reviewCount, photos: g.photos,
+          reviews: g.reviews, mapsUri: g.mapsUri, website: g.website, description: g.description,
+          phone: d.phone || g.phone, hours: d.hours.length ? d.hours : g.hours, openNow: g.openNow,
+          reservable: g.reservable, lunch: g.lunch, dinner: g.dinner, takeout: g.takeout,
+        };
+      } catch (e) {
+        return { ...d, google: "error", googleError: e?.message };
+      }
     },
   };
 
-  const provider = () => apiKey ? LiveProvider : SampleProvider;
+  const provider = () => dataset ? DatasetProvider : apiKey ? LiveProvider : SampleProvider;
 
   function getLocation() {
-    if (!apiKey) return Promise.resolve(SAMPLE_ORIGIN); // サンプルでは渋谷駅を現在地とみなす
+    if (provider() === SampleProvider) return Promise.resolve(SAMPLE_ORIGIN); // サンプルでは渋谷駅を現在地とみなす
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) return reject(new Error("このブラウザは位置情報に対応していません。"));
       navigator.geolocation.getCurrentPosition(
@@ -503,7 +628,7 @@ button { cursor: pointer; }
   }
 
   // ---- 検索 ----
-  const canSearch = () => !state.loading && (state.nearMe || state.area.trim() || state.keyword.trim() || !apiKey);
+  const canSearch = () => !state.loading && (state.nearMe || state.area.trim() || state.keyword.trim() || provider() === SampleProvider);
 
   async function search() {
     if (!canSearch()) return;
@@ -512,9 +637,10 @@ button { cursor: pointer; }
       const origin = state.nearMe ? await getLocation() : null;
       const keyword = state.keyword.trim() || "飲食店";
       const textQuery = state.nearMe ? keyword : `${state.area.trim()} ${keyword}`.trim();
-      const results = await provider().search({ textQuery, keyword: state.keyword, origin });
+      const results = await provider().search({ textQuery, area: state.area, keyword: state.keyword, origin });
       Object.assign(state, { results, origin, searched: true });
       if (!origin && state.sort === "distance") state.sort = "ranking";
+      if (origin && dataset) state.sort = "distance";
     } catch (e) {
       state.error = e?.message || "検索に失敗しました。";
     } finally {
@@ -529,7 +655,10 @@ button { cursor: pointer; }
       r.reviewCount >= f.minReviews &&
       (!f.prices.length || f.prices.includes(r.priceLevel)) &&
       (!f.openOnly || r.openNow === true) &&
-      (!f.reserveOnly || r.reservable === true));
+      (!f.reserveOnly || r.reservable === true) &&
+      (!f.noSmoking || r.smoking === "禁煙") &&
+      (!f.privateRoom || r.privateRoom === true) &&
+      (!f.counter || r.counter === true));
     const by = {
       ranking: (a, b) => (adjusted(b) ?? -1) - (adjusted(a) ?? -1) || b.reviewCount - a.reviewCount,
       rating: (a, b) => (b.rating ?? -1) - (a.rating ?? -1) || b.reviewCount - a.reviewCount,
@@ -538,11 +667,11 @@ button { cursor: pointer; }
     }[state.sort];
     return (state.sort === "distance" && !state.origin) ? list : list.sort(by);
   }
-  const activeFilters = () => { const f = state.filters; return [f.minRating > 0, f.minReviews > 0, f.prices.length > 0, f.openOnly, f.reserveOnly].filter(Boolean).length; };
+  const activeFilters = () => { const f = state.filters; return [f.minRating > 0, f.minReviews > 0, f.prices.length > 0, f.openOnly, f.reserveOnly, f.noSmoking, f.privateRoom, f.counter].filter(Boolean).length; };
 
   // ---- 描画 ----
   function render() {
-    $("demoBanner").hidden = !!apiKey;
+    renderBanner();
     $("area").value = state.nearMe ? "現在地周辺" : state.area;
     $("area").disabled = state.nearMe;
     $("nearMe").setAttribute("aria-pressed", String(state.nearMe));
@@ -550,7 +679,12 @@ button { cursor: pointer; }
     $("genres").innerHTML = GENRES.map((g) => `<button type="button" class="chip" data-genre="${esc(g)}" aria-pressed="${state.keyword === g}">${esc(g)}</button>`).join("");
 
     $("resultBar").hidden = !(state.searched || state.loading);
-    const sorts = SORTS.filter((s) => s.id !== "distance" || state.origin);
+    const sorts = dataset
+      ? [{ id: "ranking", label: "標準" }, ...(state.origin ? [SORTS[3]] : [])]
+      : SORTS.filter((s) => s.id !== "distance" || state.origin);
+    $("attr").textContent = dataset
+      ? "データ: " + (datasetSources.map((k) => SOURCE_CREDIT[k] || SOURCE_LABEL[k] || k).join(" / ") || "読み込んだファイル")
+      : "評価・口コミ: Google マップ";
     $("tabs").innerHTML = sorts.map((s) => `<button type="button" class="tab" role="tab" data-sort="${s.id}" aria-selected="${state.sort === s.id}">${s.label}</button>`).join("");
     const n = activeFilters();
     $("filterBadge").hidden = n === 0;
@@ -562,11 +696,45 @@ button { cursor: pointer; }
 
     const items = visible();
     $("count").innerHTML = `${items.length}<small>件</small>`;
-    status.innerHTML = state.searched && !items.length ? `<p class="empty">条件に合うお店が見つかりませんでした。</p>` : "";
-    $("rankNote").hidden = !(state.sort === "ranking" && items.length);
+    status.innerHTML = state.searched && !items.length ? `<p class="empty">条件に合うお店が見つかりませんでした。</p>`
+      : dataset && !state.searched ? `<p class="empty">エリアやキーワードを入れて検索してください。</p>` : "";
+    if (dataset && state.results.length >= MAX_DATASET_RESULTS) status.innerHTML = `<p class="note">表示は${MAX_DATASET_RESULTS}件までです。条件を足して絞ってください。</p>`;
+    $("rankNote").hidden = !(state.sort === "ranking" && items.length && !dataset);
     $("rankNote").textContent = `ランキングは Google マップの★を口コミ件数で補正したスコア順です（口コミが少ない店は★${PRIOR_MEAN.toFixed(1)}に近づけて評価）。`;
-    const showRank = state.sort === "ranking" || state.sort === "rating";
+    const showRank = !dataset && (state.sort === "ranking" || state.sort === "rating");
     list.innerHTML = items.map((r, i) => cardHtml(r, showRank ? i + 1 : null)).join("");
+  }
+
+  function renderBanner() {
+    const banner = $("demoBanner"), link = $("demoKeyLink");
+    if (dataset) {
+      $("bannerText").textContent = `集めたデータ（${fmt(dataset.length)}店）から検索しています。`;
+      link.textContent = "APIキーを設定すると、詳細画面に Google の★と口コミを表示します";
+      link.hidden = !!apiKey;
+      banner.hidden = false;
+    } else if (!apiKey) {
+      $("bannerText").textContent = "サンプルデータ（架空の店舗）で表示中です。";
+      link.textContent = "APIキーを設定すると実際のお店を検索できます";
+      link.hidden = false;
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
+  }
+
+  function facilityTags(r) {
+    return [
+      r.smoking ? `<span class="tag-fac ${r.smoking === "禁煙" ? "good" : ""}">${esc(r.smoking)}</span>` : "",
+      r.privateRoom ? `<span class="tag-fac">個室</span>` : "",
+      r.counter ? `<span class="tag-fac">カウンター</span>` : "",
+    ].join("");
+  }
+
+  function sourcesHtml(r) {
+    const entries = Object.entries(r.sources || {});
+    if (!entries.length) return "";
+    return `<span class="sources">${entries.map(([k, v]) =>
+      esc(SOURCE_LABEL[k] || k) + (v?.rating != null ? ` ${Number(v.rating).toFixed(2)}${v.rating_count ? `(${fmt(v.rating_count)})` : ""}` : "")).join(" ・ ")}</span>`;
   }
 
   function thumbHtml(r, cls) {
@@ -577,19 +745,20 @@ button { cursor: pointer; }
   function cardHtml(r, rank) {
     const adj = adjusted(r);
     const dist = state.origin && r.location ? fmtDist(distance(state.origin, r.location)) : null;
-    const price = r.priceLevel ? PRICE[r.priceLevel] : null;
+    const price = r.priceText || (r.priceLevel ? PRICE[r.priceLevel] : null);
     return `<li><button type="button" class="card" data-id="${esc(r.id)}">
       <div class="card-head">${rank ? `<span class="rank ${rank <= 3 ? "r" + rank : ""}">${rank}位</span>` : ""}<span class="name">${esc(r.name)}</span></div>
       <div class="sub">${esc([r.area, r.genre].filter(Boolean).join(" / "))}</div>
       <div class="card-body">
         ${thumbHtml(r, "thumb")}
         <div class="info">
-          ${r.rating == null ? `<span>評価なし</span>` : `<div class="score">${starsHtml(r.rating)}<span class="rating">${r.rating.toFixed(1)}</span><span class="reviews">(${fmt(r.reviewCount)}件)</span></div>`}
+          ${r.rating == null ? (r.dataset ? sourcesHtml(r) : `<span>評価なし</span>`) : `<div class="score">${starsHtml(r.rating)}<span class="rating">${r.rating.toFixed(1)}</span><span class="reviews">(${fmt(r.reviewCount)}件)</span></div>`}
           ${adj == null ? "" : `<span class="adj">補正スコア ${adj.toFixed(2)}</span>`}
           ${price ? `<span style="font-size:13px">予算 ${price}</span>` : ""}
           <div class="tags">
             ${r.openNow === true ? `<span class="tag-open">営業中</span>` : r.openNow === false ? `<span class="tag-closed">営業時間外</span>` : ""}
             ${r.reservable ? `<span>予約可</span>` : ""}
+            ${facilityTags(r)}
             ${dist ? `<span>${dist}</span>` : ""}
           </div>
         </div>
@@ -625,23 +794,30 @@ button { cursor: pointer; }
     const photos = d.photos.length
       ? d.photos.map((p, i) => `<figure><img src="${esc(p.url)}" alt="" loading="${i ? "lazy" : "eager"}"><figcaption>${p.author ? `写真: ${p.authorUri ? `<a href="${esc(p.authorUri)}" target="_blank" rel="noopener">${esc(p.author)}</a>` : esc(p.author)}　` : ""}${i + 1} / ${d.photos.length}</figcaption></figure>`).join("")
       : `<figure><div class="ph" aria-hidden="true">${esc(d.glyph || "食")}</div></figure>`;
-    const routeUrl = d.location ? `https://www.google.com/maps/dir/?api=1&destination=${d.location.lat},${d.location.lng}${d.sample ? "" : `&destination_place_id=${encodeURIComponent(d.id)}`}` : null;
+    const routeUrl = d.location ? `https://www.google.com/maps/dir/?api=1&destination=${d.location.lat},${d.location.lng}${d.placeId ? `&destination_place_id=${encodeURIComponent(d.placeId)}` : ""}` : null;
     const mapUrl = d.mapsUri || (d.location ? `https://www.google.com/maps/search/?api=1&query=${d.location.lat},${d.location.lng}` : null);
     const scenes = [d.lunch && "ランチ", d.dinner && "ディナー", d.takeout && "テイクアウト"].filter(Boolean).join("・");
     const info = [
-      ["住所", d.address], ["予算", d.priceLevel ? PRICE[d.priceLevel] : null], ["電話番号", d.phone],
+      ["住所", d.address], ["予算", d.priceText || (d.priceLevel ? PRICE[d.priceLevel] : null)], ["電話番号", d.phone],
       ["予約", d.reservable == null ? null : d.reservable ? "予約可" : "予約不可"], ["利用シーン", scenes || null],
+      ["禁煙・喫煙", d.smoking], ["個室", yn(d.privateRoom)], ["カウンター席", yn(d.counter)],
       ["営業時間", d.hours.length ? d.hours.join("\n") : null],
+      ["情報元", Object.entries(d.sources || {}).map(([k, v]) =>
+        (SOURCE_LABEL[k] || k) + (v?.rating != null ? `（評価 ${v.rating}${v.rating_count ? `・${fmt(v.rating_count)}件` : ""}）` : "")).join("\n") || null],
     ].filter(([, v]) => v);
     return detailBar(d.name) + `
       <div class="photos">${photos}</div>
       <div class="wrap">
         <div class="d-head"><h1>${esc(d.name)}</h1><div class="sub">${esc([d.area, d.genre].filter(Boolean).join(" / "))}</div></div>
         <div class="scorebox">
-          ${d.rating == null ? `<span>まだ評価がありません</span>` : `
+          ${d.rating == null ? `<span>${esc(
+            d.google === "nokey" ? "APIキーを設定すると、Google マップの★と口コミを表示します。"
+            : d.google === "notfound" ? "Google マップで同じお店が見つかりませんでした。"
+            : d.google === "error" ? `Google マップの評価を取得できませんでした（${d.googleError || "不明なエラー"}）`
+            : "まだ評価がありません")}</span>` : `
           <div class="big"><span class="rating">${d.rating.toFixed(1)}</span><div>${starsHtml(d.rating)}<div class="reviews">口コミ ${fmt(d.reviewCount)}件</div></div></div>`}
           ${adj == null ? "" : `<hr><div><b>補正スコア ${adj.toFixed(2)}</b><div class="adj">口コミ件数を考慮した値（${PRIOR_WEIGHT}件相当の★${PRIOR_MEAN.toFixed(1)}を加味）</div></div>`}
-          <span class="attr">評価・口コミ: Google マップ${d.sample ? "（このお店はサンプルです）" : ""}</span>
+          <span class="attr">${d.dataset && d.google !== "ok" ? "" : "評価・口コミ: Google マップ"}${d.sample ? "（このお店はサンプルです）" : ""}${d.dataset ? `${d.google === "ok" ? " / " : ""}店舗情報: ${esc(Object.keys(d.sources || {}).map((k) => SOURCE_CREDIT[k] || SOURCE_LABEL[k] || k).join(" / "))}` : ""}</span>
         </div>
         <div class="actions">
           ${mapUrl ? `<a href="${esc(mapUrl)}" target="_blank" rel="noopener"><b>🗺</b>地図</a>` : ""}
@@ -652,8 +828,8 @@ button { cursor: pointer; }
         ${d.description ? `<p>${esc(d.description)}</p>` : ""}
         <h3 class="section-title">店舗情報</h3>
         <dl class="infotable">${info.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
-        <h3 class="section-title">口コミ（Google マップ）</h3>
-        ${d.reviews.length ? d.reviews.map(reviewHtml).join("") : `<p class="empty">口コミはまだありません。</p>`}
+        ${d.dataset && d.google !== "ok" ? "" : `<h3 class="section-title">口コミ（Google マップ）</h3>
+        ${d.reviews.length ? d.reviews.map(reviewHtml).join("") : `<p class="empty">口コミはまだありません。</p>`}`}
         ${d.mapsUri ? `<a class="btn-outline" href="${esc(d.mapsUri)}" target="_blank" rel="noopener">Google マップで${fmt(d.reviewCount)}件の口コミをすべて見る</a>` : `<div style="height:40px"></div>`}
       </div>`;
   }
@@ -680,6 +856,16 @@ button { cursor: pointer; }
     $("optPrice").innerHTML = Object.entries(PRICE).map(([k, v]) => opt("price", k, v, draft.prices.includes(k))).join("");
     $("optOpen").checked = draft.openOnly;
     $("optReserve").checked = draft.reserveOnly;
+    $("optNoSmoking").checked = draft.noSmoking;
+    $("optPrivate").checked = draft.privateRoom;
+    $("optCounter").checked = draft.counter;
+    // Google マップのデータには設備情報が無いため、Google 検索中は使えない
+    const facilityOk = provider() !== LiveProvider;
+    for (const id of ["optNoSmoking", "optPrivate", "optCounter"]) $(id).disabled = !facilityOk;
+    $("facilityNote").hidden = facilityOk;
+    // 集めたデータには Google の評価が無いため、評価・口コミ件数の条件は出さない
+    $("ratingSection").hidden = !!dataset;
+    $("reviewSection").hidden = !!dataset;
   }
   function showSheet(name, show) { $(name + "Sheet").hidden = !show; $(name + "Backdrop").hidden = !show; }
 
@@ -719,12 +905,53 @@ button { cursor: pointer; }
   });
   $("optOpen").addEventListener("change", (e) => { draft.openOnly = e.target.checked; });
   $("optReserve").addEventListener("change", (e) => { draft.reserveOnly = e.target.checked; });
-  $("clearFilter").addEventListener("click", () => { draft = { minRating: 0, minReviews: 0, prices: [], openOnly: false, reserveOnly: false }; renderFilterSheet(); });
+  $("optNoSmoking").addEventListener("change", (e) => { draft.noSmoking = e.target.checked; });
+  $("optPrivate").addEventListener("change", (e) => { draft.privateRoom = e.target.checked; });
+  $("optCounter").addEventListener("change", (e) => { draft.counter = e.target.checked; });
+  $("clearFilter").addEventListener("click", () => { draft = structuredClone(DEFAULT_FILTERS); renderFilterSheet(); });
   $("applyFilter").addEventListener("click", () => { state.filters = draft; showSheet("filter", false); render(); });
 
   const openKey = () => { $("keyInput").value = apiKey; showSheet("key", true); };
   $("openKey").addEventListener("click", openKey);
   $("demoKeyLink").addEventListener("click", openKey);
+
+  // ---- 集めたデータの読み込み ----
+  function loadDataset(json, label) {
+    if (!Array.isArray(json) || !json.length || typeof json[0] !== "object") {
+      throw new Error("店舗の配列になっていません");
+    }
+    dataset = json.filter((m) => m && m.name).map(fromRecord);
+    datasetSources = [...new Set(dataset.flatMap((r) => Object.keys(r.sources)))];
+    detailCache.clear();
+    Object.assign(state, { results: [], searched: false, origin: null, error: null, area: "", keyword: "", nearMe: false, sort: "ranking" });
+    $("keyword").value = "";
+    $("dataStatus").textContent = `${label} から ${fmt(dataset.length)}店を読み込みました。`;
+    render();
+  }
+  $("openData").addEventListener("click", () => showSheet("data", true));
+  $("closeData").addEventListener("click", () => showSheet("data", false));
+  $("dataBackdrop").addEventListener("click", () => showSheet("data", false));
+  $("dataFile").addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    $("dataStatus").textContent = "読み込み中…";
+    try {
+      loadDataset(JSON.parse(await file.text()), file.name);
+      showSheet("data", false);
+    } catch (err) {
+      $("dataStatus").textContent = `読み込めませんでした（${err.message}）。merge で出力した restaurants.json を選んでください。`;
+    }
+    e.target.value = "";
+  });
+  $("clearData").addEventListener("click", () => {
+    if (!dataset) { showSheet("data", false); return; }
+    dataset = null; datasetSources = [];
+    detailCache.clear();
+    Object.assign(state, { results: [], searched: false, origin: null, error: null, sort: "ranking" });
+    $("dataStatus").textContent = "読み込みを解除しました。";
+    showSheet("data", false);
+    if (provider() === SampleProvider) { state.area = "渋谷駅"; search(); } else render();
+  });
   $("keyBackdrop").addEventListener("click", () => showSheet("key", false));
   function setKey(k) {
     const changed = k !== apiKey;
@@ -745,6 +972,12 @@ button { cursor: pointer; }
   // キー未設定ならサンプルの検索結果を最初から表示する
   if (!apiKey) { state.area = "渋谷駅"; search(); } else { render(); }
   route();
+  // サーバーで配信していて、同じフォルダに restaurants.json があれば自動で読み込む
+  if (location.protocol.startsWith("http")) {
+    fetch("restaurants.json").then((r) => r.ok ? r.json() : null)
+      .then((j) => { if (j) loadDataset(j, "restaurants.json"); })
+      .catch(() => {});
+  }
 })();
 </script>
 </body>

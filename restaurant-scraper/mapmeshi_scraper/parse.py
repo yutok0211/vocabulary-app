@@ -8,6 +8,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from .facilities import extract_facilities
 from .sites import Site, normalize_shop_url
 
 RESTAURANT_TYPES = {
@@ -30,6 +31,9 @@ class Shop:
     rating: float | None = None
     rating_count: int | None = None
     opening_hours: list[str] = field(default_factory=list)
+    smoking: str | None = None        # 禁煙 / 分煙 / 喫煙可
+    private_room: bool | None = None
+    counter: bool | None = None       # カウンター席
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -138,6 +142,10 @@ def parse_shop(html: str, url: str, site: Site) -> Shop | None:
             opening_hours=_as_list(obj.get("openingHours")) if isinstance(obj.get("openingHours"), list) else
             ([obj["openingHours"]] if isinstance(obj.get("openingHours"), str) else []),
         )
+
+    for key, value in extract_facilities(soup).items():
+        if value is not None:
+            setattr(shop, key, value)
 
     if shop.rating is None:
         shop.rating = _num(_first_text(soup, site.rating_selectors))

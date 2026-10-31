@@ -141,13 +141,15 @@ def do_merge(args) -> int:
     site_keys = [s.key for s in SITES]
     with (out / "restaurants.csv").open("w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["店名", "住所", "電話", "ジャンル", "予算", "営業時間", "緯度", "経度"]
+        yn = {True: "あり", False: "なし", None: ""}
+        w.writerow(["店名", "住所", "電話", "ジャンル", "予算", "営業時間", "禁煙・喫煙", "個室", "カウンター席", "緯度", "経度"]
                    + [f"{s.label}_評価" for s in SITES] + [f"{s.label}_件数" for s in SITES]
                    + [f"{s.label}_URL" for s in SITES])
         for m in merged:
             src = m["sources"]
             w.writerow([m["name"], m["address"], m["phone"], " / ".join(m["genre"]), m["price"],
-                        " / ".join(m["opening_hours"]), m["lat"], m["lng"]]
+                        " / ".join(m["opening_hours"]), m["smoking"] or "", yn[m["private_room"]], yn[m["counter"]],
+                        m["lat"], m["lng"]]
                        + [src.get(k, {}).get("rating") for k in site_keys]
                        + [src.get(k, {}).get("rating_count") for k in site_keys]
                        + [src.get(k, {}).get("url") for k in site_keys])

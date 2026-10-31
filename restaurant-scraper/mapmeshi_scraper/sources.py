@@ -7,6 +7,7 @@ from typing import Iterator
 
 import requests
 
+from .facilities import NO_SMOKING, PARTIAL, SMOKING, counter_from_text, normalize_smoking, normalize_yes_no
 from .fetch import DEFAULT_UA, Blocked
 from .parse import Shop
 from .prefectures import iso_code, resolve
@@ -29,6 +30,8 @@ OSM_CUISINE_JA = {
     "vietnamese": "ベトナム料理", "coffee_shop": "カフェ", "cake": "ケーキ", "seafood": "海鮮",
     "chicken": "鶏料理", "fried_chicken": "唐揚げ", "western": "洋食", "bakery": "パン",
 }
+OSM_SMOKING = {"no": NO_SMOKING, "outside": NO_SMOKING, "separated": PARTIAL, "isolated": PARTIAL,
+               "dedicated": SMOKING, "yes": SMOKING}
 OSM_AMENITY_JA = {"cafe": "カフェ", "bar": "バー", "pub": "パブ", "fast_food": "ファストフード",
                   "ice_cream": "アイスクリーム", "izakaya": "居酒屋", "food_court": "フードコート"}
 
@@ -64,6 +67,7 @@ def osm_element_to_shop(el: dict) -> Shop | None:
         phone=tags.get("phone") or tags.get("contact:phone"),
         genre=genre,
         opening_hours=[tags["opening_hours"]] if tags.get("opening_hours") else [],
+        smoking=OSM_SMOKING.get(tags.get("smoking", "")),
     )
 
 
@@ -101,6 +105,10 @@ def hotpepper_shop_to_shop(s: dict) -> Shop:
         genre=genres,
         price=budget.get("average") or budget.get("name") or None,
         opening_hours=[hours] if hours else [],
+        smoking=normalize_smoking(s.get("non_smoking")),
+        private_room=normalize_yes_no(s.get("private_room")),
+        # API にカウンター席の項目は無いため、備考に書かれている場合だけ拾う
+        counter=counter_from_text(" ".join(str(s.get(k) or "") for k in ("other_memo", "shop_detail_memo", "catch"))),
     )
 
 

@@ -91,6 +91,9 @@ def merge(shops: list[Shop]) -> list[dict]:
     for g in groups:
         def first(attr):
             return next((getattr(x, attr) for x in g if getattr(x, attr)), None)
+
+        def known(attr):  # False も有効な値として扱う
+            return next((getattr(x, attr) for x in g if getattr(x, attr) is not None), None)
         merged.append({
             "name": g[0].name,
             "address": first("address"),
@@ -100,6 +103,9 @@ def merge(shops: list[Shop]) -> list[dict]:
             "genre": sorted({c for x in g for c in x.genre}),
             "price": first("price"),
             "opening_hours": first("opening_hours") or [],
+            "smoking": known("smoking"),
+            "private_room": known("private_room"),
+            "counter": known("counter"),
             "sources": {
                 x.site: {"url": x.url, "rating": x.rating, "rating_count": x.rating_count, "name": x.name}
                 for x in g

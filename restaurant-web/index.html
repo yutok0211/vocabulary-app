@@ -26,6 +26,7 @@
   --bronze: #a8683a;
   --demo-bg: #fff4d6;
   --demo-fg: #6b4a00;
+  --stop: #c62828;
   --font-display: "Dela Gothic One", "Hiragino Kaku Gothic StdN", "Yu Gothic", sans-serif;
   --font-body: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
   --font-num: "Barlow Condensed", "Arial Narrow", sans-serif;
@@ -36,14 +37,14 @@
   :root:not([data-theme="light"]) {
     --bg: #1a1512; --surface: #241d18; --surface-2: #2f2620; --fg: #f1e9e1; --muted: #b3a294;
     --line: #3d322a; --accent: #ff8a3a; --accent-ink: #2a1300; --star: #ffb640; --open: #6cc27a;
-    --gold: #e0bb4a; --silver: #b7bec4; --bronze: #d29561; --demo-bg: #3a2f12; --demo-fg: #f3d68a;
+    --gold: #e0bb4a; --silver: #b7bec4; --bronze: #d29561; --demo-bg: #3a2f12; --demo-fg: #f3d68a; --stop: #ef5350;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #1a1512; --surface: #241d18; --surface-2: #2f2620; --fg: #f1e9e1; --muted: #b3a294;
   --line: #3d322a; --accent: #ff8a3a; --accent-ink: #2a1300; --star: #ffb640; --open: #6cc27a;
-  --gold: #e0bb4a; --silver: #b7bec4; --bronze: #d29561; --demo-bg: #3a2f12; --demo-fg: #f3d68a;
+  --gold: #e0bb4a; --silver: #b7bec4; --bronze: #d29561; --demo-bg: #3a2f12; --demo-fg: #f3d68a; --stop: #ef5350;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -80,6 +81,18 @@ button { cursor: pointer; }
 @media (max-width: 480px) { .brand small { display: none; } .appbar .wrap { gap: 8px; } }
 
 .demo-banner { background: var(--demo-bg); color: var(--demo-fg); font-size: 13px; }
+.usage-banner { color: #fff; font-size: 13px; font-weight: 700; }
+.usage-banner button { all: unset; cursor: pointer; display: block; width: 100%; padding-block: 8px; }
+.usage-banner.warn { background: var(--accent); }
+.usage-banner.stop { background: var(--stop); }
+.usage-row { display: grid; gap: 6px; }
+.usage-row .head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.usage-row .num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.usage-row .num.warn { color: var(--accent); } .usage-row .num.stop { color: var(--stop); } .usage-row .num.ok { color: var(--open); }
+.bar { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--open); }
+.bar i.warn { background: var(--accent); } .bar i.stop { background: var(--stop); }
+.usage-row input { width: 7em; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: var(--bg); font-variant-numeric: tabular-nums; }
 .demo-banner .wrap { padding-block: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .demo-banner button { background: none; border: 0; padding: 0; text-decoration: underline; color: inherit; font-weight: 700; }
 
@@ -239,6 +252,7 @@ button { cursor: pointer; }
   <div class="wrap">
     <h1 class="brand">マップめし<small>Google マップの評価で探す</small></h1>
     <span class="spacer"></span>
+    <button class="icon-btn" id="openUsage" type="button" hidden>API 0%</button>
     <button class="icon-btn" id="openData" type="button">データ</button>
     <button class="icon-btn" id="openKey" type="button">APIキー</button>
   </div>
@@ -250,6 +264,8 @@ button { cursor: pointer; }
     <button type="button" id="demoKeyLink">APIキーを設定すると実際のお店を検索できます</button>
   </div>
 </div>
+
+<div class="usage-banner" id="usageBanner" hidden><div class="wrap"><button type="button" id="usageBannerText"></button></div></div>
 
 <section class="search">
   <form class="wrap" id="searchForm" autocomplete="off">
@@ -337,6 +353,18 @@ button { cursor: pointer; }
   </div>
 </section>
 
+<!-- API の利用状況 -->
+<div class="sheet-backdrop" id="usageBackdrop" hidden></div>
+<section class="sheet" id="usageSheet" hidden aria-label="API の利用状況">
+  <div class="wrap keyform">
+    <h2>Google マップ API の利用状況</h2>
+    <p id="usageIntro"></p>
+    <div id="usageRows" style="display:grid;gap:16px"></div>
+    <p>数えているのはこのブラウザからの利用だけです。上限の初期値は1,000回で、Google の無料枠に合わせて変更してください。ほかの端末やアプリと同じキーを使う場合は、Google Cloud Console の「割り当て」で1日の上限も設定すると確実です。</p>
+    <div class="sheet-actions"><span></span><button type="button" class="btn-primary" id="closeUsage">閉じる</button></div>
+  </div>
+</section>
+
 <!-- 詳細 -->
 <section class="detail" id="detail" hidden aria-live="polite"></section>
 
@@ -394,6 +422,43 @@ button { cursor: pointer; }
   const cleanAddress = (a) => (a || "").replace(/^日本、\s*/, "").replace(/^〒\d{3}-\d{4}\s*/, "");
   const norm = (s) => String(s ?? "").normalize("NFKC").toLowerCase();
   const yn = (v) => v == null ? null : v ? "あり" : "なし";
+
+  // ---- Google マップ API の利用回数（月ごと・このブラウザ分） ----
+  // Google の請求月（米国太平洋時間）で区切り、上限の80%で警告、100%で翌月まで呼び出しを止める。
+  const usage = (() => {
+    const STORAGE = "mapmeshi.usage";
+    const SKUS = { search: "検索", details: "店舗詳細", photos: "写真" };
+    const DEFAULT_LIMIT = 1000;
+    const WARNING_RATIO = 0.8;
+    const monthNow = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+    let data = { month: monthNow(), counts: {}, limits: {} };
+    try { data = { ...data, ...JSON.parse(localStorage.getItem(STORAGE) || "{}") }; } catch (_) {}
+    const save = () => { try { localStorage.setItem(STORAGE, JSON.stringify(data)); } catch (_) {} };
+    const rollover = () => { const m = monthNow(); if (data.month !== m) { data.month = m; data.counts = {}; save(); } };
+    const count = (k) => data.counts[k] || 0;
+    const limit = (k) => data.limits[k] ?? DEFAULT_LIMIT;
+    const ratio = (k) => limit(k) <= 0 ? 1 : count(k) / limit(k);
+    const level = (k) => ratio(k) >= 1 ? "stop" : ratio(k) >= WARNING_RATIO ? "warn" : "ok";
+    const resetLabel = () => {
+      const [y, mo] = data.month.split("-").map(Number);
+      return `${mo === 12 ? 1 : mo + 1}月1日`;
+    };
+    const listeners = [];
+    const notify = () => listeners.forEach((f) => f());
+    return {
+      SKUS, count, limit, ratio, level, resetLabel,
+      month: () => (rollover(), data.month),
+      blocked: (k) => (rollover(), level(k) === "stop"),
+      check(k) {
+        rollover();
+        if (level(k) === "stop") throw new Error(`今月の Google マップ API「${SKUS[k]}」の上限に達したため停止しています。${resetLabel()}（日本時間 16〜17時ごろ）に再開します。`);
+      },
+      record(k) { rollover(); data.counts[k] = count(k) + 1; save(); notify(); },
+      setLimit(k, v) { data.limits[k] = Math.max(0, Math.floor(v)); save(); notify(); },
+      worst: () => (rollover(), Object.keys(SKUS).map(level).sort((a, b) => ["ok", "warn", "stop"].indexOf(b) - ["ok", "warn", "stop"].indexOf(a))[0]),
+      onChange: (f) => listeners.push(f),
+    };
+  })();
 
   // ---- データ取得: サンプル ----
   // すべて架空の店舗。UI 確認用。
@@ -492,34 +557,40 @@ button { cursor: pointer; }
       reservable: p.reservable ?? null,
       photos: (p.photos || []).slice(0, 10).map((ph) => {
         const a = (ph.authorAttributions || [])[0] || {};
-        return { url: ph.getURI({ maxWidth: 800 }), author: a.displayName || null, authorUri: a.uri || null };
+        return { url: ph.getURI({ maxWidth: 800 }), author: a.displayName || null, authorUri: a.uri || null, google: true };
       }),
     };
   }
 
   const LiveProvider = {
     async search({ textQuery, origin }) {
+      usage.check("search");
       const { Place } = await loadMaps(apiKey);
       const req = { textQuery, fields: SEARCH_FIELDS, language: "ja", region: "jp", maxResultCount: 20 };
       if (origin) req.locationBias = { center: origin, radius: NEARBY_RADIUS };
       const { places } = await Place.searchByText(req);
+      usage.record("search");
       const food = (places || []).filter((p) =>
         (p.types || []).some((t) => FOOD_TYPES.has(t) || t.endsWith("_restaurant")) &&
         p.businessStatus !== "CLOSED_PERMANENTLY");
       return Promise.all(food.map(toRestaurant));
     },
     async detail(id) {
+      usage.check("details");
       const { Place } = await loadMaps(apiKey);
       const p = new Place({ id, requestedLanguage: "ja" });
       await p.fetchFields({ fields: DETAIL_FIELDS });
+      usage.record("details");
       return placeToDetail(p);
     },
     /** 集めたデータの店舗を Google マップの店舗と突き合わせる。見つからなければ null。 */
     async match(rec) {
+      usage.check("search");
       const { Place } = await loadMaps(apiKey);
       const req = { textQuery: `${rec.name} ${rec.address || ""}`.trim(), fields: DETAIL_FIELDS, language: "ja", region: "jp", maxResultCount: 1 };
       if (rec.location) req.locationBias = { center: rec.location, radius: 200 };
       const { places } = await Place.searchByText(req);
+      usage.record("search");
       const p = places?.[0];
       if (!p) return null;
       if (rec.location && p.location && distance(rec.location, { lat: p.location.lat(), lng: p.location.lng() }) > 300) return null;
@@ -628,7 +699,8 @@ button { cursor: pointer; }
   }
 
   // ---- 検索 ----
-  const canSearch = () => !state.loading && (state.nearMe || state.area.trim() || state.keyword.trim() || provider() === SampleProvider);
+  const searchBlocked = () => provider() === LiveProvider && usage.blocked("search");
+  const canSearch = () => !state.loading && !searchBlocked() && (state.nearMe || state.area.trim() || state.keyword.trim() || provider() === SampleProvider);
 
   async function search() {
     if (!canSearch()) return;
@@ -672,6 +744,7 @@ button { cursor: pointer; }
   // ---- 描画 ----
   function render() {
     renderBanner();
+    renderUsage();
     $("area").value = state.nearMe ? "現在地周辺" : state.area;
     $("area").disabled = state.nearMe;
     $("nearMe").setAttribute("aria-pressed", String(state.nearMe));
@@ -703,6 +776,42 @@ button { cursor: pointer; }
     $("rankNote").textContent = `ランキングは Google マップの★を口コミ件数で補正したスコア順です（口コミが少ない店は★${PRIOR_MEAN.toFixed(1)}に近づけて評価）。`;
     const showRank = !dataset && (state.sort === "ranking" || state.sort === "rating");
     list.innerHTML = items.map((r, i) => cardHtml(r, showRank ? i + 1 : null)).join("");
+  }
+
+  function renderUsage() {
+    const btn = $("openUsage");
+    btn.hidden = !apiKey;
+    btn.textContent = `API ${Math.min(999, Math.round(usage.ratio("search") * 100))}%`;
+    const keys = Object.keys(usage.SKUS);
+    const stopped = keys.filter((k) => usage.blocked(k));
+    const warned = keys.filter((k) => usage.level(k) === "warn");
+    const banner = $("usageBanner");
+    if (apiKey && stopped.length) {
+      banner.className = "usage-banner stop";
+      $("usageBannerText").textContent = `今月の上限に達したため停止中: ${stopped.map((k) => usage.SKUS[k]).join("・")}（${usage.resetLabel()}に再開）` +
+        (stopped.includes("search") ? "。集めたデータでの検索は使えます。" : "");
+      banner.hidden = false;
+    } else if (apiKey && warned.length) {
+      banner.className = "usage-banner warn";
+      $("usageBannerText").textContent = "今月の上限の80%を超えました: " +
+        warned.map((k) => `${usage.SKUS[k]} ${fmt(usage.count(k))}/${fmt(usage.limit(k))}回`).join("・");
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
+  }
+
+  function renderUsageSheet() {
+    const [y, m] = usage.month().split("-").map(Number);
+    $("usageIntro").textContent = `${m}月分。${usage.resetLabel()}（日本時間 16〜17時ごろ）に0回に戻ります。上限の80%で警告し、上限に達すると翌月まで Google への問い合わせを止めます（集めたデータでの検索は使えます）。`;
+    $("usageRows").innerHTML = Object.entries(usage.SKUS).map(([k, label]) => {
+      const lv = usage.level(k);
+      return `<div class="usage-row">
+        <div class="head"><b>${label}</b><span class="num ${lv}">${fmt(usage.count(k))} / ${fmt(usage.limit(k))}回</span>
+          <label style="margin-left:auto;font-size:12px">月の上限 <input type="number" min="0" step="100" inputmode="numeric" id="limit-${k}" data-limit="${k}" value="${usage.limit(k)}"></label></div>
+        <div class="bar"><i class="${lv}" style="width:${Math.min(100, usage.ratio(k) * 100)}%"></i></div>
+      </div>`;
+    }).join("");
   }
 
   function renderBanner() {
@@ -737,8 +846,13 @@ button { cursor: pointer; }
       esc(SOURCE_LABEL[k] || k) + (v?.rating != null ? ` ${Number(v.rating).toFixed(2)}${v.rating_count ? `(${fmt(v.rating_count)})` : ""}` : "")).join(" ・ ")}</span>`;
   }
 
+  // 写真の上限に達したら Google の写真は読み込まない（読み込んだ写真は onload で1回数える）
+  const usablePhotos = (photos) => (photos || []).filter((p) => !p.google || !usage.blocked("photos"));
+  const photoAttr = (p) => p.google ? " data-gphoto" : "";
+
   function thumbHtml(r, cls) {
-    if (r.photos?.[0]) return `<img class="${cls}" src="${esc(r.photos[0].url)}" alt="" loading="lazy">`;
+    const ph = usablePhotos(r.photos)[0];
+    if (ph) return `<img class="${cls}" src="${esc(ph.url)}" alt="" loading="lazy"${photoAttr(ph)}>`;
     return `<div class="${cls}" aria-hidden="true">${esc(r.glyph || "食")}</div>`;
   }
 
@@ -791,8 +905,9 @@ button { cursor: pointer; }
 
   function detailHtml(d) {
     const adj = adjusted(d);
-    const photos = d.photos.length
-      ? d.photos.map((p, i) => `<figure><img src="${esc(p.url)}" alt="" loading="${i ? "lazy" : "eager"}"><figcaption>${p.author ? `写真: ${p.authorUri ? `<a href="${esc(p.authorUri)}" target="_blank" rel="noopener">${esc(p.author)}</a>` : esc(p.author)}　` : ""}${i + 1} / ${d.photos.length}</figcaption></figure>`).join("")
+    const shown = usablePhotos(d.photos);
+    const photos = shown.length
+      ? shown.map((p, i) => `<figure><img src="${esc(p.url)}" alt="" loading="${i ? "lazy" : "eager"}"${photoAttr(p)}><figcaption>${p.author ? `写真: ${p.authorUri ? `<a href="${esc(p.authorUri)}" target="_blank" rel="noopener">${esc(p.author)}</a>` : esc(p.author)}　` : ""}${i + 1} / ${shown.length}</figcaption></figure>`).join("")
       : `<figure><div class="ph" aria-hidden="true">${esc(d.glyph || "食")}</div></figure>`;
     const routeUrl = d.location ? `https://www.google.com/maps/dir/?api=1&destination=${d.location.lat},${d.location.lng}${d.placeId ? `&destination_place_id=${encodeURIComponent(d.placeId)}` : ""}` : null;
     const mapUrl = d.mapsUri || (d.location ? `https://www.google.com/maps/search/?api=1&query=${d.location.lat},${d.location.lng}` : null);
@@ -929,6 +1044,29 @@ button { cursor: pointer; }
     render();
   }
   $("openData").addEventListener("click", () => showSheet("data", true));
+  const openUsage = () => { renderUsageSheet(); showSheet("usage", true); };
+  $("openUsage").addEventListener("click", openUsage);
+  $("usageBannerText").addEventListener("click", openUsage);
+  $("closeUsage").addEventListener("click", () => showSheet("usage", false));
+  $("usageBackdrop").addEventListener("click", () => showSheet("usage", false));
+  $("usageRows").addEventListener("change", (e) => {
+    const k = e.target.dataset.limit;
+    if (k && e.target.value !== "") { usage.setLimit(k, Number(e.target.value)); renderUsageSheet(); }
+  });
+  // 写真は実際に読み込まれたときに数える（同じ写真はこのページを開いている間1回だけ）
+  const countedPhotos = new Set();
+  document.addEventListener("load", (e) => {
+    const img = e.target;
+    if (img.tagName !== "IMG" || !img.hasAttribute("data-gphoto") || countedPhotos.has(img.src)) return;
+    countedPhotos.add(img.src);
+    usage.record("photos");
+  }, true);
+  let lastWorst = usage.worst();
+  usage.onChange(() => {
+    const w = usage.worst();
+    if (w !== lastWorst) { lastWorst = w; render(); } else { renderUsage(); }
+    $("searchBtn").disabled = !canSearch();
+  });
   $("closeData").addEventListener("click", () => showSheet("data", false));
   $("dataBackdrop").addEventListener("click", () => showSheet("data", false));
   $("dataFile").addEventListener("change", async (e) => {

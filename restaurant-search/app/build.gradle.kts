@@ -30,6 +30,17 @@ android {
         )
     }
 
+    signingConfigs {
+        // リポジトリに含めたデバッグ用キー。どこでビルドしても署名（SHA-1）が同じになり、
+        // API キーの「Android アプリ」制限に登録したまま使える。リリース用には使わないこと。
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

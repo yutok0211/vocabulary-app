@@ -8,6 +8,10 @@ import com.example.gurume.data.RestaurantRepository
 import com.example.gurume.data.dataset.Dataset
 import com.example.gurume.data.dataset.DatasetShop
 import com.example.gurume.data.dataset.DatasetStore
+import com.example.gurume.data.usage.ApiSku
+import com.example.gurume.data.usage.UsageLevel
+import com.example.gurume.data.usage.UsageMeter
+import com.example.gurume.data.usage.UsageSnapshot
 import com.example.gurume.domain.GeoPoint
 import com.example.gurume.domain.Restaurant
 import com.example.gurume.domain.SearchFilters
@@ -40,11 +44,15 @@ data class SearchUiState(
     val datasetSize: Int? = null,
     val datasetSources: List<String> = emptyList(),
     val message: String? = null,
+    val usage: UsageSnapshot? = null,
 ) {
     val datasetMode: Boolean get() = datasetSize != null
     val visibleResults: List<Restaurant> = results.filterAndSort(filters, sort, origin)
+    /** Google の検索が今月の上限に達している（集めたデータでの検索は引き続き使える）。 */
+    val searchBlocked: Boolean get() = !datasetMode && usage?.level(ApiSku.SEARCH) == UsageLevel.EXHAUSTED
     val canSearch: Boolean
-        get() = !loading && (datasetMode || hasApiKey) && (nearMe || area.isNotBlank() || keyword.isNotBlank())
+        get() = !loading && !searchBlocked && (datasetMode || hasApiKey) &&
+            (nearMe || area.isNotBlank() || keyword.isNotBlank())
 }
 
 class SearchViewModel(
@@ -52,6 +60,7 @@ class SearchViewModel(
     private val locationProvider: LocationProvider,
     private val datasets: DatasetStore,
     private val apiKeys: ApiKeyStore,
+    private val usage: UsageMeter,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SearchUiState())
@@ -59,6 +68,22 @@ class SearchViewModel(
 
     init {
         viewModelScope.launch { datasets.restore() }
+        viewModelScope.launch {
+            usage.rollover()
+            var lastLevel: UsageLevel? = null
+            usage.state.collect { snapshot ->
+                val level = snapshot.worst
+                // 起動後に警告・停止の段階へ進んだときだけ知らせる（一覧上部の表示は常に出る）
+                val message = when {
+                    lastLevel == null || level.ordinal <= lastLevel!!.ordinal -> null
+                    level == UsageLevel.EXHAUSTED -> "Google マップ API の今月の上限に達しました"
+                    level == UsageLevel.WARNING -> "Google マップ API の利用が今月の上限の80%を超えました"
+                    else -> null
+                }
+                lastLevel = level
+                _state.update { it.copy(usage = snapshot, message = message ?: it.message) }
+            }
+        }
         viewModelScope.launch {
             combine(datasets.shops, apiKeys.key) { shops, key -> shops to key }.collect { (shops, key) ->
                 val datasetChanged = shops?.size != _state.value.datasetSize
@@ -88,6 +113,7 @@ class SearchViewModel(
     }
 
     fun saveApiKey(value: String) = apiKeys.save(value)
+    fun setUsageLimit(sku: ApiSku, limit: Int) = usage.setLimit(sku, limit)
     fun currentApiKey(): String = apiKeys.current
 
     fun importDataset(uri: Uri) {

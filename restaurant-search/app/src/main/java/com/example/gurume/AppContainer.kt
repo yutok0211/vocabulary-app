@@ -9,6 +9,9 @@ import com.example.gurume.data.dataset.DatasetStore
 import com.example.gurume.data.remote.ApiKeyInterceptor
 import com.example.gurume.data.remote.PlaceMapper
 import com.example.gurume.data.remote.PlacesApi
+import com.example.gurume.data.usage.PrefsUsageStorage
+import com.example.gurume.data.usage.UsageInterceptor
+import com.example.gurume.data.usage.UsageMeter
 import com.example.gurume.location.LocationProvider
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -24,6 +27,8 @@ class AppContainer(context: Context) {
 
     val datasets = DatasetStore(context)
 
+    val usage = UsageMeter(PrefsUsageStorage(context))
+
     private val json = Json {
         ignoreUnknownKeys = true
         // languageCode などデフォルト値を持つフィールドも送信し、null のフィールドは省略する
@@ -33,6 +38,7 @@ class AppContainer(context: Context) {
 
     /** Places API と写真読み込み（Coil）で共用する。 */
     val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(UsageInterceptor(usage))
         .addInterceptor(ApiKeyInterceptor({ apiKeys.current }, context.packageName, signingCertSha1(context)))
         .apply {
             if (BuildConfig.DEBUG) {

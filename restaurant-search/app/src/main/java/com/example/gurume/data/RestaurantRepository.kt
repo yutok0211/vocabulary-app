@@ -8,6 +8,7 @@ import com.example.gurume.data.remote.PlaceMapper
 import com.example.gurume.data.remote.PlacesApi
 import com.example.gurume.data.remote.SearchTextRequest
 import com.example.gurume.data.remote.isFoodPlace
+import com.example.gurume.data.usage.UsageLimitExceeded
 import com.example.gurume.domain.GeoPoint
 import com.example.gurume.domain.Restaurant
 import com.example.gurume.domain.RestaurantDetail
@@ -19,9 +20,10 @@ class RestaurantRepository(
 ) {
     /**
      * テキスト検索。Places API は 1 ページ最大 20 件・最大 3 ページ（60 件）まで。
-     * 評価順の並び替えは API 側でできないため、取得した全件を端末側で並べ替える。
+     * 1 ページごとに課金されるため、無料枠に収まるよう既定は 1 ページ（20 件）にしている。
+     * 評価順の並び替えは API 側でできないため、取得した結果を端末側で並べ替える。
      */
-    suspend fun search(textQuery: String, near: GeoPoint?, maxPages: Int = 3): List<Restaurant> {
+    suspend fun search(textQuery: String, near: GeoPoint?, maxPages: Int = 1): List<Restaurant> {
         val base = SearchTextRequest(
             textQuery = textQuery,
             locationBias = near?.let {
@@ -31,7 +33,11 @@ class RestaurantRepository(
         val places = mutableListOf<PlaceDto>()
         var token: String? = null
         for (page in 0 until maxPages) {
-            val res = api.searchText(PlacesApi.SEARCH_FIELD_MASK, base.copy(pageToken = token))
+            val res = try {
+                api.searchText(PlacesApi.SEARCH_FIELD_MASK, base.copy(pageToken = token))
+            } catch (e: UsageLimitExceeded) {
+                if (page == 0) throw e else break // 途中で上限に達したら取得済みの分だけ返す
+            }
             places += res.places
             token = res.nextPageToken ?: break
         }

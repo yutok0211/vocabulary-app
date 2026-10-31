@@ -33,7 +33,13 @@ class MainActivity : ComponentActivity() {
                         val vm: SearchViewModel = viewModel(
                             factory = viewModelFactory {
                                 initializer {
-                                    SearchViewModel(container.repository, container.locationProvider, container.datasets, container.apiKeys)
+                                    SearchViewModel(
+                                        container.repository,
+                                        container.locationProvider,
+                                        container.datasets,
+                                        container.apiKeys,
+                                        container.usage,
+                                    )
                                 }
                             },
                         )

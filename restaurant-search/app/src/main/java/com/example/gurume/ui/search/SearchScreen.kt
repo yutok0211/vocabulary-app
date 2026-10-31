@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -32,9 +34,12 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -55,6 +60,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -63,10 +69,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.gurume.data.dataset.Dataset
+import com.example.gurume.data.usage.ApiSku
+import com.example.gurume.data.usage.UsageLevel
 import com.example.gurume.domain.Scoring
 import com.example.gurume.domain.SortOrder
 import com.example.gurume.ui.components.GoogleAttribution
 import com.example.gurume.ui.components.RestaurantCard
+import com.example.gurume.ui.components.formatCount
 
 private val GENRES = listOf(
     "ラーメン", "寿司", "焼肉", "居酒屋", "焼き鳥", "そば", "うどん",
@@ -85,6 +94,8 @@ fun SearchScreen(
     var showFilters by rememberSaveable { mutableStateOf(false) }
     var showDataset by rememberSaveable { mutableStateOf(false) }
     var showApiKey by rememberSaveable { mutableStateOf(false) }
+    var showUsage by rememberSaveable { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(state.message) {
@@ -130,11 +141,23 @@ fun SearchScreen(
             TopAppBar(
                 title = { Text("マップめし", fontWeight = FontWeight.Bold) },
                 actions = {
-                    TextButton(onClick = { showDataset = true }) {
-                        Text("データ", color = MaterialTheme.colorScheme.onPrimary)
+                    state.usage?.let { usage ->
+                        TextButton(onClick = { showUsage = true }) {
+                            Text(
+                                "API ${(usage.ratio(ApiSku.SEARCH) * 100).toInt().coerceAtMost(999)}%",
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
                     }
-                    TextButton(onClick = { showApiKey = true }) {
-                        Text("APIキー", color = MaterialTheme.colorScheme.onPrimary)
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "メニュー", tint = MaterialTheme.colorScheme.onPrimary)
+                        }
+                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                            DropdownMenuItem(text = { Text("集めたデータ") }, onClick = { showMenu = false; showDataset = true })
+                            DropdownMenuItem(text = { Text("API キー") }, onClick = { showMenu = false; showApiKey = true })
+                            DropdownMenuItem(text = { Text("API の利用状況") }, onClick = { showMenu = false; showUsage = true })
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -179,12 +202,33 @@ fun SearchScreen(
                 }
             }
 
+            state.usage?.let { usage ->
+                val blocked = ApiSku.entries.filter { usage.level(it) == UsageLevel.EXHAUSTED }
+                val warned = ApiSku.entries.filter { usage.level(it) == UsageLevel.WARNING }
+                val reset = "${usage.resetDate.monthValue}月${usage.resetDate.dayOfMonth}日"
+                when {
+                    blocked.isNotEmpty() -> item {
+                        UsageBanner(
+                            "今月の上限に達したため停止中: ${blocked.joinToString("・") { it.label }}（${reset}に再開）" +
+                                if (ApiSku.SEARCH in blocked) "。集めたデータでの検索は使えます。" else "",
+                            UsageLevel.EXHAUSTED,
+                        ) { showUsage = true }
+                    }
+                    warned.isNotEmpty() -> item {
+                        UsageBanner(
+                            "今月の上限の80%を超えました: " +
+                                warned.joinToString("・") { "${it.label} ${formatCount(usage.count(it))}/${formatCount(usage.limit(it))}回" },
+                            UsageLevel.WARNING,
+                        ) { showUsage = true }
+                    }
+                }
+            }
             when {
                 state.datasetMode -> item {
                     Banner("集めたデータ（%,d店）から検索しています。".format(state.datasetSize))
                 }
                 !state.hasApiKey -> item {
-                    Banner("画面右上の「APIキー」で Google Maps の API キーを設定するか、「データ」から集めたデータを読み込んでください。")
+                    Banner("右上のメニューから Google Maps の API キーを設定するか、集めたデータを読み込んでください。")
                 }
             }
 
@@ -306,6 +350,12 @@ fun SearchScreen(
         )
     }
 
+    if (showUsage) {
+        state.usage?.let { usage ->
+            UsageSheet(usage = usage, onLimitChange = viewModel::setUsageLimit, onDismiss = { showUsage = false })
+        }
+    }
+
     if (showFilters) {
         FilterSheet(
             initial = state.filters,
@@ -374,6 +424,21 @@ private fun SearchPanel(
             }
         }
     }
+}
+
+@Composable
+private fun UsageBanner(text: String, level: UsageLevel, onClick: () -> Unit) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = Color.White,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(usageColor(level))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 @Composable

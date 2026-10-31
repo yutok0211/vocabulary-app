@@ -44,7 +44,7 @@ interface PlacesApi {
             "nextPageToken",
         ).joinToString(",")
 
-        val DETAIL_FIELD_MASK = listOf(
+        val DETAIL_FIELDS = listOf(
             "id",
             "displayName",
             "formattedAddress",
@@ -69,6 +69,10 @@ interface PlacesApi {
             "servesDinner",
             "takeout",
             "goodForGroups",
-        ).joinToString(",")
+        )
+        val DETAIL_FIELD_MASK = DETAIL_FIELDS.joinToString(",")
+
+        /** 集めたデータの店を Google の店と照合するとき用（検索 1 回で詳細まで取る）。 */
+        val MATCH_FIELD_MASK = DETAIL_FIELDS.joinToString(",") { "places.$it" }
     }
 }

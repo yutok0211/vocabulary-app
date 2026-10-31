@@ -1,5 +1,6 @@
 package com.example.gurume
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,13 +32,14 @@ class MainActivity : ComponentActivity() {
                     composable("search") {
                         val vm: SearchViewModel = viewModel(
                             factory = viewModelFactory {
-                                initializer { SearchViewModel(container.repository, container.locationProvider) }
+                                initializer {
+                                    SearchViewModel(container.repository, container.locationProvider, container.datasets, container.apiKeys)
+                                }
                             },
                         )
                         SearchScreen(
                             viewModel = vm,
-                            hasApiKey = container.hasApiKey,
-                            onRestaurantClick = { id -> nav.navigate("detail/$id") },
+                            onRestaurantClick = { id -> nav.navigate("detail/${Uri.encode(id)}") },
                         )
                     }
                     composable(
@@ -47,7 +49,7 @@ class MainActivity : ComponentActivity() {
                         val placeId = entry.arguments?.getString("placeId").orEmpty()
                         val vm: DetailViewModel = viewModel(
                             factory = viewModelFactory {
-                                initializer { DetailViewModel(placeId, container.repository) }
+                                initializer { DetailViewModel(placeId, container.repository, container.datasets, container.apiKeys) }
                             },
                         )
                         DetailScreen(viewModel = vm, onBack = { nav.popBackStack() })

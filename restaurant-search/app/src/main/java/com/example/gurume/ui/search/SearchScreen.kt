@@ -38,13 +38,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -57,6 +62,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.gurume.data.dataset.Dataset
 import com.example.gurume.domain.Scoring
 import com.example.gurume.domain.SortOrder
 import com.example.gurume.ui.components.GoogleAttribution
@@ -71,13 +77,28 @@ private val GENRES = listOf(
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel,
-    hasApiKey: Boolean,
     onRestaurantClick: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     var showFilters by rememberSaveable { mutableStateOf(false) }
+    var showDataset by rememberSaveable { mutableStateOf(false) }
+    var showApiKey by rememberSaveable { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
+
+    LaunchedEffect(state.message) {
+        state.message?.let {
+            snackbar.showSnackbar(it)
+            viewModel.messageShown()
+        }
+    }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            showDataset = false
+            viewModel.importDataset(uri)
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -108,12 +129,21 @@ fun SearchScreen(
         topBar = {
             TopAppBar(
                 title = { Text("マップめし", fontWeight = FontWeight.Bold) },
+                actions = {
+                    TextButton(onClick = { showDataset = true }) {
+                        Text("データ", color = MaterialTheme.colorScheme.onPrimary)
+                    }
+                    TextButton(onClick = { showApiKey = true }) {
+                        Text("APIキー", color = MaterialTheme.colorScheme.onPrimary)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
@@ -149,14 +179,23 @@ fun SearchScreen(
                 }
             }
 
-            if (!hasApiKey) {
-                item { Message("local.properties に PLACES_API_KEY を設定してください。") }
+            when {
+                state.datasetMode -> item {
+                    Banner("集めたデータ（%,d店）から検索しています。".format(state.datasetSize))
+                }
+                !state.hasApiKey -> item {
+                    Banner("画面右上の「APIキー」で Google Maps の API キーを設定するか、「データ」から集めたデータを読み込んでください。")
+                }
             }
 
             if (state.searched || state.loading) {
                 stickyHeader {
                     Column(Modifier.background(MaterialTheme.colorScheme.background)) {
-                        val sorts = SortOrder.entries.filter { it != SortOrder.DISTANCE || state.origin != null }
+                        val sorts = if (state.datasetMode) {
+                            listOfNotNull(SortOrder.RANKING, SortOrder.DISTANCE.takeIf { state.origin != null })
+                        } else {
+                            SortOrder.entries.filter { it != SortOrder.DISTANCE || state.origin != null }
+                        }
                         ScrollableTabRow(
                             selectedTabIndex = sorts.indexOf(state.sort).coerceAtLeast(0),
                             edgePadding = 12.dp,
@@ -165,7 +204,7 @@ fun SearchScreen(
                                 Tab(
                                     selected = state.sort == order,
                                     onClick = { viewModel.onSortChange(order) },
-                                    text = { Text(order.label) },
+                                    text = { Text(if (state.datasetMode && order == SortOrder.RANKING) "標準" else order.label) },
                                 )
                             }
                         }
@@ -179,7 +218,17 @@ fun SearchScreen(
                                 fontWeight = FontWeight.Bold,
                             )
                             Spacer(Modifier.width(8.dp))
-                            GoogleAttribution()
+                            if (state.datasetMode) {
+                                Text(
+                                    state.datasetSources.joinToString(" / ") { Dataset.SOURCE_CREDIT[it] ?: Dataset.SOURCE_LABEL[it] ?: it },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                            } else {
+                                GoogleAttribution()
+                            }
                             Spacer(Modifier.weight(1f))
                             BadgedBox(badge = {
                                 if (state.filters.activeCount > 0) Badge { Text("${state.filters.activeCount}") }
@@ -206,7 +255,10 @@ fun SearchScreen(
                     Message("条件に合うお店が見つかりませんでした。")
                 }
                 else -> {
-                    if (state.sort == SortOrder.RANKING && state.visibleResults.isNotEmpty()) {
+                    if (state.datasetMode && state.results.size >= Dataset.MAX_RESULTS) {
+                        item { Message("表示は${Dataset.MAX_RESULTS}件までです。条件を足して絞ってください。") }
+                    }
+                    if (!state.datasetMode && state.sort == SortOrder.RANKING && state.visibleResults.isNotEmpty()) {
                         item {
                             Text(
                                 "ランキングは Google マップの評価を口コミ件数で補正したスコア順です" +
@@ -218,7 +270,7 @@ fun SearchScreen(
                         }
                     }
                     itemsIndexed(state.visibleResults, key = { _, r -> r.id }) { index, r ->
-                        val showRank = state.sort == SortOrder.RANKING || state.sort == SortOrder.RATING
+                        val showRank = !state.datasetMode && (state.sort == SortOrder.RANKING || state.sort == SortOrder.RATING)
                         RestaurantCard(
                             rank = if (showRank) index + 1 else null,
                             restaurant = r,
@@ -232,9 +284,32 @@ fun SearchScreen(
         }
     }
 
+    if (showDataset) {
+        DatasetSheet(
+            datasetSize = state.datasetSize,
+            onPickFile = { filePicker.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
+            onClear = {
+                showDataset = false
+                viewModel.clearDataset()
+            },
+            onDismiss = { showDataset = false },
+        )
+    }
+    if (showApiKey) {
+        ApiKeyDialog(
+            initial = viewModel.currentApiKey(),
+            onSave = {
+                viewModel.saveApiKey(it)
+                showApiKey = false
+            },
+            onDismiss = { showApiKey = false },
+        )
+    }
+
     if (showFilters) {
         FilterSheet(
             initial = state.filters,
+            datasetMode = state.datasetMode,
             onApply = {
                 viewModel.onFiltersChange(it)
                 showFilters = false
@@ -299,6 +374,19 @@ private fun SearchPanel(
             }
         }
     }
+}
+
+@Composable
+private fun Banner(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 @Composable

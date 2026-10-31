@@ -3,7 +3,9 @@ package com.example.gurume
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import com.example.gurume.data.ApiKeyStore
 import com.example.gurume.data.RestaurantRepository
+import com.example.gurume.data.dataset.DatasetStore
 import com.example.gurume.data.remote.ApiKeyInterceptor
 import com.example.gurume.data.remote.PlaceMapper
 import com.example.gurume.data.remote.PlacesApi
@@ -18,9 +20,9 @@ import java.security.MessageDigest
 
 /** 手動 DI コンテナ。 */
 class AppContainer(context: Context) {
-    private val apiKey = BuildConfig.PLACES_API_KEY
+    val apiKeys = ApiKeyStore(context)
 
-    val hasApiKey: Boolean = apiKey.isNotBlank()
+    val datasets = DatasetStore(context)
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -31,7 +33,7 @@ class AppContainer(context: Context) {
 
     /** Places API と写真読み込み（Coil）で共用する。 */
     val okHttpClient: OkHttpClient = OkHttpClient.Builder()
-        .addInterceptor(ApiKeyInterceptor(apiKey, context.packageName, signingCertSha1(context)))
+        .addInterceptor(ApiKeyInterceptor({ apiKeys.current }, context.packageName, signingCertSha1(context)))
         .apply {
             if (BuildConfig.DEBUG) {
                 addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))

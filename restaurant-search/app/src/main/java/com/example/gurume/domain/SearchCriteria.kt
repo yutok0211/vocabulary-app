@@ -16,6 +16,9 @@ data class SearchFilters(
     val priceLevels: Set<PriceLevel> = emptySet(),
     val openNowOnly: Boolean = false,
     val reservableOnly: Boolean = false,
+    val noSmokingOnly: Boolean = false,
+    val privateRoomOnly: Boolean = false,
+    val counterOnly: Boolean = false,
 ) {
     val activeCount: Int
         get() = listOf(
@@ -24,6 +27,9 @@ data class SearchFilters(
             priceLevels.isNotEmpty(),
             openNowOnly,
             reservableOnly,
+            noSmokingOnly,
+            privateRoomOnly,
+            counterOnly,
         ).count { it }
 
     fun matches(r: Restaurant): Boolean {
@@ -32,6 +38,9 @@ data class SearchFilters(
         if (priceLevels.isNotEmpty() && r.priceLevel !in priceLevels) return false
         if (openNowOnly && r.openNow != true) return false
         if (reservableOnly && r.reservable != true) return false
+        if (noSmokingOnly && r.smoking != Smoking.NO_SMOKING) return false
+        if (privateRoomOnly && r.privateRoom != true) return false
+        if (counterOnly && r.counter != true) return false
         return true
     }
 }

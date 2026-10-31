@@ -11,6 +11,7 @@ import com.example.gurume.data.remote.isFoodPlace
 import com.example.gurume.domain.GeoPoint
 import com.example.gurume.domain.Restaurant
 import com.example.gurume.domain.RestaurantDetail
+import com.example.gurume.domain.Scoring
 
 class RestaurantRepository(
     private val api: PlacesApi,
@@ -40,10 +41,33 @@ class RestaurantRepository(
             .map(mapper::toRestaurant)
     }
 
+    /**
+     * 集めたデータの店を Google マップの店と照合する。店名＋住所で検索し、
+     * 位置が 300m 以上離れていれば別の店とみなして null を返す。
+     */
+    suspend fun matchGoogle(name: String, address: String?, location: GeoPoint?): RestaurantDetail? {
+        val request = SearchTextRequest(
+            textQuery = listOfNotNull(name, address).joinToString(" "),
+            pageSize = 1,
+            locationBias = location?.let {
+                LocationBias(Circle(LatLngDto(it.latitude, it.longitude), radius = MATCH_RADIUS_METERS))
+            },
+        )
+        val place = api.searchText(PlacesApi.MATCH_FIELD_MASK, request).places.firstOrNull() ?: return null
+        val detail = mapper.toDetail(place)
+        val found = detail.summary.location
+        if (location != null && found != null && Scoring.distanceMeters(location, found) > MAX_MATCH_DISTANCE_METERS) {
+            return null
+        }
+        return detail
+    }
+
     suspend fun detail(placeId: String): RestaurantDetail =
         mapper.toDetail(api.getPlace(placeId, PlacesApi.DETAIL_FIELD_MASK, languageCode = "ja", regionCode = "JP"))
 
     companion object {
         const val NEARBY_RADIUS_METERS = 1_500.0
+        const val MATCH_RADIUS_METERS = 200.0
+        const val MAX_MATCH_DISTANCE_METERS = 300.0
     }
 }

@@ -1,9 +1,12 @@
 package com.example.gurume.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,12 +32,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.gurume.domain.Restaurant
+import com.example.gurume.domain.Smoking
 import com.example.gurume.ui.theme.Bronze
 import com.example.gurume.ui.theme.Gold
 import com.example.gurume.ui.theme.OpenGreen
 import com.example.gurume.ui.theme.Orange
 import com.example.gurume.ui.theme.Silver
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RestaurantCard(
     rank: Int?,
@@ -87,7 +92,7 @@ fun RestaurantCard(
                     restaurant.priceLabel?.let {
                         Text("予算 $it", style = MaterialTheme.typography.bodySmall)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         when (restaurant.openNow) {
                             true -> Text("営業中", color = OpenGreen, style = MaterialTheme.typography.labelMedium)
                             false -> Text(
@@ -100,6 +105,11 @@ fun RestaurantCard(
                         if (restaurant.reservable == true) {
                             Text("予約可", style = MaterialTheme.typography.labelMedium)
                         }
+                        restaurant.smoking?.let {
+                            FacilityTag(it.label, highlight = it == Smoking.NO_SMOKING)
+                        }
+                        if (restaurant.privateRoom == true) FacilityTag("個室")
+                        if (restaurant.counter == true) FacilityTag("カウンター")
                         distanceMeters?.let {
                             Text(formatDistance(it), style = MaterialTheme.typography.labelMedium)
                         }
@@ -115,7 +125,17 @@ private fun ScoreRow(restaurant: Restaurant) {
     val rating = restaurant.rating
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (rating == null) {
-            Text("評価なし", style = MaterialTheme.typography.bodyMedium)
+            if (restaurant.fromDataset) {
+                Text(
+                    restaurant.sources.joinToString(" ・ ") { s ->
+                        s.label + (s.rating?.let { r -> " %.2f".format(r) + (s.ratingCount?.let { c -> "(${formatCount(c)})" } ?: "") } ?: "")
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text("評価なし", style = MaterialTheme.typography.bodyMedium)
+            }
             return@Row
         }
         RatingStars(rating)
@@ -133,6 +153,19 @@ private fun ScoreRow(restaurant: Restaurant) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+@Composable
+private fun FacilityTag(text: String, highlight: Boolean = false) {
+    val color = if (highlight) OpenGreen else MaterialTheme.colorScheme.onSurfaceVariant
+    Text(
+        text,
+        color = color,
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier
+            .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp),
+    )
 }
 
 @Composable

@@ -61,6 +61,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.example.gurume.data.dataset.Dataset
+import com.example.gurume.domain.GoogleStatus
 import com.example.gurume.domain.Photo
 import com.example.gurume.domain.RestaurantDetail
 import com.example.gurume.domain.Review
@@ -135,12 +137,14 @@ private fun DetailContent(detail: RestaurantDetail) {
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                detail.googleMapsUri?.let { ActionButton(Icons.Filled.Map, "地図", Modifier.weight(1f)) { open(it) } }
+                val mapUri = detail.googleMapsUri
+                    ?: r.location?.let { "https://www.google.com/maps/search/?api=1&query=${it.latitude},${it.longitude}" }
+                mapUri?.let { ActionButton(Icons.Filled.Map, "地図", Modifier.weight(1f)) { open(it) } }
                 r.location?.let { loc ->
                     ActionButton(Icons.Filled.Directions, "ルート", Modifier.weight(1f)) {
                         open(
                             "https://www.google.com/maps/dir/?api=1&destination=${loc.latitude},${loc.longitude}" +
-                                "&destination_place_id=${r.id}",
+                                (detail.placeId?.let { "&destination_place_id=$it" } ?: ""),
                         )
                     }
                 }
@@ -166,18 +170,29 @@ private fun DetailContent(detail: RestaurantDetail) {
                         "団体向け".takeIf { detail.goodForGroups == true },
                     ).joinToString("・").ifEmpty { null },
                 )
+                InfoRow("禁煙・喫煙", r.smoking?.label)
+                InfoRow("個室", r.privateRoom?.let { if (it) "あり" else "なし" })
+                InfoRow("カウンター席", r.counter?.let { if (it) "あり" else "なし" })
                 if (detail.weekdayHours.isNotEmpty()) {
                     InfoRow("営業時間", detail.weekdayHours.joinToString("\n"))
                 }
+                InfoRow(
+                    "情報元",
+                    r.sources.joinToString("\n") { src ->
+                        src.label + (src.rating?.let { v -> "（評価 $v" + (src.ratingCount?.let { c -> "・${formatCount(c)}件" } ?: "") + "）" } ?: "")
+                    }.ifEmpty { null },
+                )
             }
         }
 
-        item { SectionTitle("口コミ（Google マップ）") }
-        if (detail.reviews.isEmpty()) {
-            item { Text("口コミはまだありません。", Modifier.padding(horizontal = 16.dp)) }
-        }
-        items(detail.reviews) { review ->
-            ReviewCard(review, onAuthorClick = open)
+        if (detail.googleStatus == GoogleStatus.OK) {
+            item { SectionTitle("口コミ（Google マップ）") }
+            if (detail.reviews.isEmpty()) {
+                item { Text("口コミはまだありません。", Modifier.padding(horizontal = 16.dp)) }
+            }
+            items(detail.reviews) { review ->
+                ReviewCard(review, onAuthorClick = open)
+            }
         }
         detail.googleMapsUri?.let { uri ->
             item {
@@ -235,7 +250,14 @@ private fun ScoreBox(detail: RestaurantDetail) {
     Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(16.dp)) {
             if (r.rating == null) {
-                Text("まだ評価がありません")
+                Text(
+                    when (detail.googleStatus) {
+                        GoogleStatus.NO_KEY -> "API キーを設定すると、Google マップの★と口コミを表示します。"
+                        GoogleStatus.NOT_FOUND -> "Google マップで同じお店が見つかりませんでした。"
+                        GoogleStatus.ERROR -> "Google マップの評価を取得できませんでした（${detail.googleError ?: "不明なエラー"}）"
+                        GoogleStatus.OK -> "まだ評価がありません"
+                    },
+                )
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -264,7 +286,14 @@ private fun ScoreBox(detail: RestaurantDetail) {
                 }
             }
             Spacer(Modifier.height(4.dp))
-            GoogleAttribution()
+            if (detail.googleStatus == GoogleStatus.OK) GoogleAttribution()
+            if (r.fromDataset) {
+                Text(
+                    "店舗情報: " + r.sources.joinToString(" / ") { Dataset.SOURCE_CREDIT[it.key] ?: it.label },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

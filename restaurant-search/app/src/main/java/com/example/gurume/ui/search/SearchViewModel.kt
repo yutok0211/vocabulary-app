@@ -1,8 +1,13 @@
 package com.example.gurume.ui.search
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.gurume.data.ApiKeyStore
 import com.example.gurume.data.RestaurantRepository
+import com.example.gurume.data.dataset.Dataset
+import com.example.gurume.data.dataset.DatasetShop
+import com.example.gurume.data.dataset.DatasetStore
 import com.example.gurume.domain.GeoPoint
 import com.example.gurume.domain.Restaurant
 import com.example.gurume.domain.SearchFilters
@@ -12,8 +17,12 @@ import com.example.gurume.location.LocationProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/** ジャンルチップの言葉と、データ側のジャンル表記の対応。 */
+private val GENRE_ALIASES = mapOf("焼肉" to "焼肉", "イタリアン" to "イタリア", "フレンチ" to "フラン", "カフェ" to "カフェ")
 
 data class SearchUiState(
     val area: String = "",
@@ -26,18 +35,44 @@ data class SearchUiState(
     val searched: Boolean = false,
     val origin: GeoPoint? = null,
     val results: List<Restaurant> = emptyList(),
+    val hasApiKey: Boolean = false,
+    /** 読み込んだデータの店舗数。null なら Google マップで検索する。 */
+    val datasetSize: Int? = null,
+    val datasetSources: List<String> = emptyList(),
+    val message: String? = null,
 ) {
+    val datasetMode: Boolean get() = datasetSize != null
     val visibleResults: List<Restaurant> = results.filterAndSort(filters, sort, origin)
-    val canSearch: Boolean get() = !loading && (nearMe || area.isNotBlank() || keyword.isNotBlank())
+    val canSearch: Boolean
+        get() = !loading && (datasetMode || hasApiKey) && (nearMe || area.isNotBlank() || keyword.isNotBlank())
 }
 
 class SearchViewModel(
     private val repository: RestaurantRepository,
     private val locationProvider: LocationProvider,
+    private val datasets: DatasetStore,
+    private val apiKeys: ApiKeyStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch { datasets.restore() }
+        viewModelScope.launch {
+            combine(datasets.shops, apiKeys.key) { shops, key -> shops to key }.collect { (shops, key) ->
+                val datasetChanged = shops?.size != _state.value.datasetSize
+                _state.update {
+                    val base = it.copy(
+                        hasApiKey = key.isNotBlank(),
+                        datasetSize = shops?.size,
+                        datasetSources = shops.orEmpty().flatMap { s -> s.restaurant.sources.map { src -> src.key } }.distinct(),
+                    )
+                    if (datasetChanged) base.copy(results = emptyList(), searched = false, origin = null, sort = SortOrder.RANKING) else base
+                }
+            }
+        }
+    }
 
     fun onAreaChange(value: String) = _state.update { it.copy(area = value) }
     fun onKeywordChange(value: String) = _state.update { it.copy(keyword = value) }
@@ -52,6 +87,26 @@ class SearchViewModel(
         if (_state.value.canSearch) search()
     }
 
+    fun saveApiKey(value: String) = apiKeys.save(value)
+    fun currentApiKey(): String = apiKeys.current
+
+    fun importDataset(uri: Uri) {
+        viewModelScope.launch {
+            runCatching { datasets.import(uri) }
+                .onSuccess { n -> _state.update { it.copy(message = "%,d店を読み込みました".format(n)) } }
+                .onFailure { e -> _state.update { it.copy(message = "読み込めませんでした: ${e.message}") } }
+        }
+    }
+
+    fun clearDataset() {
+        viewModelScope.launch {
+            datasets.clear()
+            _state.update { it.copy(message = "データの読み込みを解除しました") }
+        }
+    }
+
+    fun messageShown() = _state.update { it.copy(message = null) }
+
     /** nearMe の場合、呼び出し前に UI 側で位置情報の権限を取得しておくこと。 */
     fun search() {
         val s = _state.value
@@ -64,18 +119,23 @@ class SearchViewModel(
                 } else {
                     null
                 }
-                val keyword = s.keyword.ifBlank { "飲食店" }
-                val query = if (s.nearMe) keyword else "${s.area} $keyword".trim()
-                origin to repository.search(query, origin)
+                val shops: List<DatasetShop>? = datasets.shops.value
+                val results = if (shops != null) {
+                    Dataset.search(shops, s.area, s.keyword, origin, GENRE_ALIASES[s.keyword.trim()])
+                } else {
+                    val keyword = s.keyword.ifBlank { "飲食店" }
+                    val query = if (s.nearMe) keyword else "${s.area} $keyword".trim()
+                    repository.search(query, origin)
+                }
+                origin to results
             }.onSuccess { (origin, results) ->
                 _state.update {
-                    it.copy(
-                        loading = false,
-                        searched = true,
-                        origin = origin,
-                        results = results,
-                        sort = if (origin == null && it.sort == SortOrder.DISTANCE) SortOrder.RANKING else it.sort,
-                    )
+                    val sort = when {
+                        origin != null && it.datasetMode -> SortOrder.DISTANCE
+                        origin == null && it.sort == SortOrder.DISTANCE -> SortOrder.RANKING
+                        else -> it.sort
+                    }
+                    it.copy(loading = false, searched = true, origin = origin, results = results, sort = sort)
                 }
             }.onFailure { e ->
                 _state.update { it.copy(loading = false, error = e.message ?: "検索に失敗しました") }

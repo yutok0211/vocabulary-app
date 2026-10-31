@@ -61,5 +61,6 @@ class PlaceMapper(private val photoUrl: (photoName: String) -> String) {
         servesDinner = dto.servesDinner,
         takeout = dto.takeout,
         goodForGroups = dto.goodForGroups,
+        placeId = dto.id,
     )
 }
